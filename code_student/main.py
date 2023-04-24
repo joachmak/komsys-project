@@ -68,9 +68,10 @@ class UserInterface:
 
         self.app.topLevel.geometry(f"{x}x{y}+{window_x}+{window_y}")
 
-    def on_task_click(self, module_number: int, task_number: int):
-        self.selected_task = task_number
-        self.selected_module = module_number
+    def on_task_click(self, btn_text: str):
+        """ Set selected task and module, and switch scene to help request view """
+        self.selected_task = int(btn_text.split(" ")[2]) - 1
+        self.selected_module = int(btn_text.split(" ")[0][1:])
         self.show_scene(Scene.HELP_REQUEST)
 
     def show_scene(self, scene: int):
@@ -79,8 +80,8 @@ class UserInterface:
             self.app.addLabel(f"Logged in as {self.logged_in_user}")
             if back_btn_func is not None:
                 self.app.addLink("Back", back_btn_func)
-            self.app.addLink("Logout", lambda x: self.show_scene(Scene.LOGIN))
-            if back_btn_func is not None:
+            self.app.addLink("Log out", lambda x: self.show_scene(Scene.LOGIN))
+            if back_btn_func is None:
                 self.app.addLabel(f"---")
             self.app.addLabel(f"--")
             self.app.addLabel(f"-")
@@ -116,14 +117,18 @@ class UserInterface:
                     if col >= buttons_per_row:
                         col = 0
                         row += 1
-                    self.app.addLink(f"M{module.number} task {i+1}", lambda x: self.on_task_click(module.number, i), column=col, row=row)
+                    # OBS: if you change the text, you must also update the parsing in the self.on_task_click method
+                    self.app.addLink(f"M{module.number} task {i+1}", self.on_task_click, column=col, row=row)
                 self.app.stopTab()
             self.app.stopTabbedFrame()
             self.app.stopLabelFrame()
         elif scene == Scene.HELP_REQUEST:
             add_side_menu(lambda x: self.show_scene(Scene.MAIN_PAGE))
-            self.app.startLabelFrame("Request help", sticky="news", row=0, rowspan=5, column=1, colspan=3)
-            self.app.addLabel("Something")
+            self.app.startLabelFrame(f"Request help with module {self.selected_module} task {self.selected_task + 1}", sticky="news", row=0, rowspan=6, column=1, colspan=3)
+            self.app.addCheckBox("Online")
+            self.app.addTextArea("Comment", text="What do you need help with?")
+            self.app.addButton("Send help request", lambda x: print("Send request..."))
+            self.app.addLabel("Request status: NOT SENT")
             self.app.stopLabelFrame()
         else:
             pass
