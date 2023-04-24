@@ -19,6 +19,8 @@ class Scene(Enum):
     LOGIN: int = 0
     MAIN_PAGE: int = 1
     HELP_REQUEST: int = 2
+    MARK_TASK_AS_DONE: int = 3
+    TASK_MENU: int = 4
 
 
 class UserInterface:
@@ -65,7 +67,7 @@ class UserInterface:
             for _i in range(rows_to_add):
                 self.app.addLabel(str(uuid1()), text="", row=_i + current_row_count + 1, rowspan=1)
 
-        def add_side_menu(back_btn_func=None):
+        def add_side_menu(back_btn_func=None, desired_rows=5):
             self.app.startLabelFrame("Menu", row=0, rowspan=5, column=0, colspan=1)
             self.app.addLabel(f"Logged in as {self.logged_in_user}")
             current_row_count = 1
@@ -74,7 +76,7 @@ class UserInterface:
                 self.app.addLink("Back", back_btn_func)
             self.app.addLink("Log out", lambda x: self.show_scene(Scene.LOGIN))
 
-            add_whitespace(5, current_row_count)
+            add_whitespace(desired_rows, current_row_count)
             self.app.stopLabelFrame()
 
         self.app.removeAllWidgets()
@@ -108,7 +110,7 @@ class UserInterface:
                 """ Set selected task and module, and switch scene to help request view """
                 self.selected_task = int(btn_text.split(" ")[2]) - 1
                 self.selected_module = int(btn_text.split(" ")[0][1:])
-                self.show_scene(Scene.HELP_REQUEST)
+                self.show_scene(Scene.TASK_MENU)
 
             self.set_window_size_and_center(500, 250)
             add_side_menu()
@@ -133,22 +135,55 @@ class UserInterface:
             self.app.setTabbedFrameSelectedTab("ModuleTabFrame", str(self.selected_module))
             self.app.stopLabelFrame()
         elif scene == Scene.HELP_REQUEST:
-            def on_submit():
+            def on_help_submit():
                 # TODO: mqtt stuff
                 print("sending mqtt request")
                 self.app.setLabel("LAB_SENT_STATUS", "Request status: SENT")
                 self.app.setLabelFg("LAB_SENT_STATUS", "orange")
                 self.app.setButton("BTN_SUBMIT", "Update help request")
 
-            add_side_menu(lambda x: self.show_scene(Scene.MAIN_PAGE))
+            add_side_menu(lambda x: self.show_scene(Scene.TASK_MENU))
             self.app.startLabelFrame(f"Request help with module {self.selected_module} task {self.selected_task + 1}",
                                      sticky="news", row=0, rowspan=6, column=1, colspan=3)
             self.app.addCheckBox("Online")
             self.app.addTextArea("Comment", text="What do you need help with?")
-            self.app.addButton("BTN_SUBMIT", on_submit)
+            self.app.addButton("BTN_SUBMIT", on_help_submit)
             self.app.setButton("BTN_SUBMIT", "Send help request")
             self.app.addLabel("LAB_SENT_STATUS", text="Request status: NOT SENT")
             self.app.setLabelFg("LAB_SENT_STATUS", "red")
+            self.app.stopLabelFrame()
+        elif scene == Scene.MARK_TASK_AS_DONE:
+            def on_task_done_submit():
+                # TODO: mqtt stuff
+                print("sending mqtt request")
+                self.app.setLabel("LAB_DONE_STATUS", "Status: DONE")
+                self.app.setLabelFg("LAB_DONE_STATUS", "green")
+                self.app.setButton("BTN_SUBMIT", "Update rating / feedback")
+            self.set_window_size_and_center(500, 300)
+            add_side_menu(lambda x: self.show_scene(Scene.TASK_MENU), desired_rows=6)
+            self.app.startLabelFrame(f"Mark task {self.selected_task + 1} module {self.selected_module} as done",
+                                     sticky="news", row=0, rowspan=6, column=1, colspan=3)
+            self.app.addLabel("LAB_RATING", text="Difficulty rating:")
+            self.app.addRadioButton("RAD_DIFFICULTY", "Easy")
+            self.app.addRadioButton("RAD_DIFFICULTY", "Medium")
+            self.app.addRadioButton("RAD_DIFFICULTY", "Hard")
+            self.app.addTextArea("TXT_FEEDBACK", text="Feedback...")
+            self.app.addButton("BTN_SUBMIT", on_task_done_submit)
+            self.app.setButton("BTN_SUBMIT", "Mark as done")
+            self.app.addLabel("LAB_DONE_STATUS", text="Status: NOT DONE")
+            self.app.setLabelFg("LAB_DONE_STATUS", "red")
+
+            self.app.stopLabelFrame()
+        elif scene == Scene.TASK_MENU:
+            self.set_window_size_and_center(500, 250)
+            add_side_menu(lambda x: self.show_scene(Scene.MAIN_PAGE))
+            self.app.startLabelFrame(f"Options for module {self.selected_module} task {self.selected_task + 1}",
+                                     sticky="news", row=0, rowspan=6, column=1, colspan=3)
+            self.app.addButton("BTN_MARK_AS_DONE", lambda x: self.show_scene(Scene.MARK_TASK_AS_DONE))
+            self.app.addButton("BTN_REQUEST_HELP", lambda x: self.show_scene(Scene.HELP_REQUEST))
+            self.app.setButton("BTN_MARK_AS_DONE", "Mark task as done")
+            self.app.setButton("BTN_REQUEST_HELP", "Send help request")
+            add_whitespace(5, 2)
             self.app.stopLabelFrame()
         else:
             pass
