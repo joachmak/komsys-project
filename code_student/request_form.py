@@ -16,6 +16,7 @@ class HelpRequest:
         self.is_online = is_online
         self.comment = comment
         self.status = RequestStatus.UNSENT
+        self.queue_pos = -1
 
     def send_request(self):
         # TODO: send to some topic through MQTT

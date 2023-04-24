@@ -153,6 +153,7 @@ class UserInterface:
                     self.active_help_request = HelpRequest(self.selected_module, self.selected_task, is_online, comment)
                     # TODO: mqtt stuff
                     print("sending mqtt request")
+                    self.active_help_request.queue_pos = 69  # TODO: find queue position
                 else:
                     # Cancel help request
                     # TODO: mqtt stuff
@@ -160,7 +161,8 @@ class UserInterface:
                     self.active_help_request = None
                 self.show_scene(Scene.HELP_REQUEST)
 
-            add_side_menu(lambda x: self.show_scene(Scene.TASK_MENU))
+            self.set_window_size_and_center(500, 300)
+            add_side_menu(lambda x: self.show_scene(Scene.TASK_MENU), desired_rows=6)
             self.app.startLabelFrame(f"Request help with module {self.selected_module} task {self.selected_task + 1}",
                                      sticky="news", row=0, rowspan=6, column=1, colspan=3)
             self.app.addCheckBox("Online")
@@ -178,6 +180,7 @@ class UserInterface:
                 self.app.setLabel("LAB_SENT_STATUS", text="Request status: SENT")
                 self.app.setButton("BTN_SUBMIT", "Cancel help request")
                 self.app.setLabelFg("LAB_SENT_STATUS", "green")
+                self.app.addLabel("LAB_QUEUE_POS", text=f"Position in queue: {self.active_help_request.queue_pos}")
             self.app.stopLabelFrame()
 
         elif scene == Scene.MARK_TASK_AS_DONE:
