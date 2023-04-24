@@ -1,3 +1,5 @@
+""" Contains constant identifiers for various gui elements """
+
 # === Start screen ===
 BTN_LOGIN = "Log in"
 TXT_GROUP_NAME = "txt_group_name"
