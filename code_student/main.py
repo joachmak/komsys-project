@@ -1,6 +1,7 @@
 from appJar import gui
 import code_student.gui_elems as elems
 from enum import Enum
+from uuid import uuid1
 
 from code_student.module import Module
 
@@ -58,16 +59,22 @@ class UserInterface:
         self.app.topLevel.geometry(f"{x}x{y}+{window_x}+{window_y}")
 
     def show_scene(self, scene: int):
+        def add_whitespace(desired_row_count: int, current_row_count: int):
+            """ Essentially just used to push elements into place """
+            rows_to_add = desired_row_count - current_row_count
+            for _i in range(rows_to_add):
+                self.app.addLabel(str(uuid1()), text="", row=_i + current_row_count + 1, rowspan=1)
+
         def add_side_menu(back_btn_func=None):
             self.app.startLabelFrame("Menu", row=0, rowspan=5, column=0, colspan=1)
             self.app.addLabel(f"Logged in as {self.logged_in_user}")
+            current_row_count = 1
             if back_btn_func is not None:
+                current_row_count = 2
                 self.app.addLink("Back", back_btn_func)
             self.app.addLink("Log out", lambda x: self.show_scene(Scene.LOGIN))
-            if back_btn_func is None:
-                self.app.addLabel(f"MENU_WHITESPACE_1", text="")
-            self.app.addLabel(f"MENU_WHITESPACE_2", text="")
-            self.app.addLabel(f"MENU_WHITESPACE_3", text="")
+
+            add_whitespace(5, current_row_count)
             self.app.stopLabelFrame()
 
         self.app.removeAllWidgets()
@@ -110,15 +117,17 @@ class UserInterface:
             buttons_per_row = 4
             for module in self.modules:
                 self.app.startTab(f"{module.number}")
-                row = 0
+                self.app.addLabel(f"LAB_MODULE_TITLE_{module.number}", text=f"Module {module.number}: {module.name}",
+                                  row=0, colspan=4).config(font=("Helvetica", 14, "bold"))
+                row = 1
                 col = -1
                 for i in range(module.task_count):
                     col += 1
                     if col >= buttons_per_row:
                         col = 0
                         row += 1
-                    # OBS: if you change the text, you must also update the parsing in the self.on_task_click method
-                    self.app.addLink(f"M{module.number} task {i+1}", on_task_click, column=col, row=row)
+                    self.app.addLink(f"M{module.number} task {i + 1}", on_task_click, colspan=1, row=row, column=col)
+                add_whitespace(desired_row_count=4, current_row_count=row)
                 self.app.stopTab()
             self.app.stopTabbedFrame()
             self.app.setTabbedFrameSelectedTab("ModuleTabFrame", str(self.selected_module))
