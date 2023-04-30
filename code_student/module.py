@@ -20,3 +20,6 @@ class Module:
     def add_request(self, request: HelpRequest):
         self.requests.append(request)
         self.latest_request = request
+
+    def __str__(self):
+        return f"Module {self.number}: {self.name}, {self.task_count} tasks"
