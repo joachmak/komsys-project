@@ -5,8 +5,8 @@ import code_student.gui_elems as elems
 from enum import Enum
 from uuid import uuid1
 
+from common.feedback import Feedback
 from common.io_utils import import_modules, import_groups
-from common.module import Module
 from code_student.help_request import HelpRequest
 
 
@@ -34,7 +34,9 @@ class UserInterface:
         self.current_scene = -1
         self.modules = modules
         self.groups = groups
+        self.feedback_responses = []
         self.logged_in_user = ""
+        self.logged_in_group_number = -1
         self.selected_module = 1
         self.selected_task = 1
         self.active_help_request: Optional[HelpRequest] = None
@@ -49,6 +51,20 @@ class UserInterface:
         self.app.setGuiPadding(5, 5)
         self.show_scene(Scene.LOGIN)
         self.app.go()
+
+    def get_feedback_idx_for_this_module_task(self, module_number: int, task_number: int):
+        for i in range(len(self.feedback_responses)):
+            fr: Feedback = self.feedback_responses[i]
+            if fr.module_number == module_number and fr.task_number == task_number:
+                return i
+        return -1
+
+    def add_or_update_feedback_response(self, feedback: Feedback):
+        feedback_idx = self.get_feedback_idx_for_this_module_task(feedback.module_number, feedback.task_number)
+        if  feedback_idx == -1:  # doesn't exist, add new
+            self.feedback_responses.append(feedback)
+            return
+        self.feedback_responses[feedback_idx] = feedback  # exists, replace
 
     def create_request_form(self, module: int, task: int):
         # comment
@@ -77,6 +93,7 @@ class UserInterface:
                 self.selected_task = self.active_help_request.task_idx
                 self.selected_module = self.active_help_request.module_number
                 self.show_scene(Scene.HELP_REQUEST)
+
             self.app.startLabelFrame("Menu", row=0, rowspan=5, column=0, colspan=1)
             self.app.addLabel(f"Logged in as {self.logged_in_user}")
             current_row_count = 1
@@ -97,6 +114,7 @@ class UserInterface:
                 """ Try logging in """
                 group_name = self.app.getOptionBox("Group")
                 self.logged_in_user = group_name
+                self.logged_in_group_number = int(group_name.split(" ")[1][:-1])
                 # TODO: do some MQTT stuff ?
                 self.show_scene(Scene.MAIN_PAGE)
 
@@ -144,7 +162,9 @@ class UserInterface:
                     comment = self.app.getTextArea("LAB_COMMENT")
                     is_online = self.app.getCheckBox("Online")
                     zoom_url = self.app.getEntry("TXT_ZOOM")
-                    self.active_help_request = HelpRequest(self.selected_module, self.selected_task, is_online, zoom_url, comment)
+                    # TODO: validation (e.g. must have zoom link if is_online, must have comment)
+                    self.active_help_request = HelpRequest(self.selected_module, self.selected_task, is_online,
+                                                           zoom_url, comment)
                     # TODO: mqtt stuff
                     print("sending mqtt request")
                     self.active_help_request.queue_pos = 69  # TODO: find queue position
@@ -182,11 +202,15 @@ class UserInterface:
 
         elif scene == Scene.MARK_TASK_AS_DONE:
             def on_task_done_submit():
+                difficulty = self.app.getRadioButton("RAD_DIFFICULTY")
+                feedback = self.app.getTextArea("TXT_FEEDBACK")
+                feedback_response = Feedback(self.logged_in_group_number, self.selected_module, self.selected_task,
+                                             feedback, difficulty)
+                self.add_or_update_feedback_response(feedback_response)
                 # TODO: mqtt stuff
                 print("sending mqtt request")
-                self.app.setLabel("LAB_DONE_STATUS", "Status: DONE")
-                self.app.setLabelFg("LAB_DONE_STATUS", "green")
-                self.app.setButton("BTN_SUBMIT", "Update rating / feedback")
+                self.show_scene(self.current_scene)
+
             self.set_window_size_and_center(500, 300)
             add_side_menu(lambda x: self.show_scene(Scene.TASK_MENU), desired_rows=6)
             self.app.startLabelFrame(f"Mark task {self.selected_task + 1} module {self.selected_module} as done",
@@ -195,11 +219,22 @@ class UserInterface:
             self.app.addRadioButton("RAD_DIFFICULTY", "Easy")
             self.app.addRadioButton("RAD_DIFFICULTY", "Medium")
             self.app.addRadioButton("RAD_DIFFICULTY", "Hard")
-            self.app.addTextArea("TXT_FEEDBACK", text="Feedback...")
+            self.app.addTextArea("TXT_FEEDBACK", text="")
             self.app.addButton("BTN_SUBMIT", on_task_done_submit)
-            self.app.setButton("BTN_SUBMIT", "Mark as done")
-            self.app.addLabel("LAB_DONE_STATUS", text="Status: NOT DONE")
-            self.app.setLabelFg("LAB_DONE_STATUS", "red")
+
+            feedback_idx = self.get_feedback_idx_for_this_module_task(self.selected_module, self.selected_task)
+            if feedback_idx != -1:
+                feedback = self.feedback_responses[feedback_idx]
+                self.app.setButton("BTN_SUBMIT", "Update task feedback")
+                self.app.addLabel("LAB_DONE_STATUS", text="Status: Done")
+                self.app.setLabelFg("LAB_DONE_STATUS", "green")
+                self.app.setRadioButton("RAD_DIFFICULTY", feedback.difficulty)
+                self.app.setTextArea("TXT_FEEDBACK", text=feedback.comment)
+            else:
+                self.app.setButton("BTN_SUBMIT", "Mark as done")
+                self.app.addLabel("LAB_DONE_STATUS", text="Status: NOT DONE")
+                self.app.setLabelFg("LAB_DONE_STATUS", "red")
+                self.app.setTextArea("TXT_FEEDBACK", "Feedback...")
             self.app.stopLabelFrame()
 
         elif scene == Scene.TASK_MENU:
@@ -216,9 +251,15 @@ class UserInterface:
             add_side_menu(lambda x: self.show_scene(Scene.MAIN_PAGE))
             self.app.startLabelFrame(f"Options for module {self.selected_module} task {self.selected_task + 1}",
                                      sticky="news", row=0, rowspan=6, column=1, colspan=3)
+            feedback_idx = self.get_feedback_idx_for_this_module_task(self.selected_module, self.selected_task)
+            if feedback_idx != -1:
+                feedback = self.feedback_responses[feedback_idx]
+                self.app.addLabel("LAB_FEEDBACK_STATUS", text=f"Status: DONE, difficulty: {feedback.difficulty}").config(fg="green")
+            else:
+                self.app.addLabel("LAB_FEEDBACK_STATUS", text=f"Status: UNFINISHED").config(fg="red")
             self.app.addButton("BTN_MARK_AS_DONE", lambda x: self.show_scene(Scene.MARK_TASK_AS_DONE))
             self.app.addButton("BTN_REQUEST_HELP", lambda x: self.show_scene(Scene.HELP_REQUEST))
-            self.app.setButton("BTN_MARK_AS_DONE", "Mark task as done")
+            self.app.setButton("BTN_MARK_AS_DONE", "Mark task as done" if feedback_idx == -1 else "Update task feedback")
             self.app.setButton("BTN_REQUEST_HELP", "Send help request")
             if self.active_help_request is not None and not has_selected_task_an_active_request():
                 self.app.disableButton("BTN_REQUEST_HELP")
@@ -235,20 +276,6 @@ class UserInterface:
             pass
 
 
-def create_modules():
-    """ Generate initial modules """
-    return [
-        Module(1, "Setup", 3),
-        Module(2, "Modeling", 5),
-        Module(3, "State Machines", 2),
-        Module(4, "Requirements", 4),
-        Module(5, "State Machines in Python", 3),
-        Module(6, "Agile Development", 4),
-        Module(7, "Communication", 4),
-        Module(8, "Sequence Diagrams", 2),
-        Module(9, "Components", 5),
-    ]
-
-
 if __name__ == "__main__":
-    ui = UserInterface(modules=sorted(import_modules(), key=lambda m: m.number), groups=sorted(import_groups(), key=lambda g: g.number))
+    ui = UserInterface(modules=sorted(import_modules(), key=lambda m: m.number),
+                       groups=sorted(import_groups(), key=lambda g: g.number))
