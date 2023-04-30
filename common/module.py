@@ -1,4 +1,4 @@
-from code_student.request_form import HelpRequest
+from code_student.help_request import HelpRequest
 
 
 class Module:

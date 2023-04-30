@@ -7,7 +7,7 @@ from uuid import uuid1
 
 from common.io_utils import import_modules, import_groups
 from common.module import Module
-from code_student.request_form import HelpRequest
+from code_student.help_request import HelpRequest
 
 
 class MQTTClient:
@@ -143,7 +143,8 @@ class UserInterface:
                     # Send new help request
                     comment = self.app.getTextArea("LAB_COMMENT")
                     is_online = self.app.getCheckBox("Online")
-                    self.active_help_request = HelpRequest(self.selected_module, self.selected_task, is_online, comment)
+                    zoom_url = self.app.getEntry("TXT_ZOOM")
+                    self.active_help_request = HelpRequest(self.selected_module, self.selected_task, is_online, zoom_url, comment)
                     # TODO: mqtt stuff
                     print("sending mqtt request")
                     self.active_help_request.queue_pos = 69  # TODO: find queue position
@@ -159,6 +160,8 @@ class UserInterface:
             self.app.startLabelFrame(f"Request help with module {self.selected_module} task {self.selected_task + 1}",
                                      sticky="news", row=0, rowspan=6, column=1, colspan=3)
             self.app.addCheckBox("Online")
+            self.app.addEntry("TXT_ZOOM")
+            self.app.setEntry("TXT_ZOOM", "Zoom meeting url (if online)")
             self.app.addTextArea("LAB_COMMENT", text="")
             self.app.addButton("BTN_SUBMIT", on_help_submit)
             self.app.setButton("BTN_SUBMIT", "Send help request")
@@ -170,6 +173,7 @@ class UserInterface:
             else:
                 self.app.setTextArea("LAB_COMMENT", text=self.active_help_request.comment)
                 self.app.setCheckBox("Online", ticked=self.active_help_request.is_online)
+                self.app.setEntry("TXT_ZOOM", text=self.active_help_request.zoom_url)
                 self.app.setLabel("LAB_SENT_STATUS", text="Request status: SENT")
                 self.app.setButton("BTN_SUBMIT", "Cancel help request")
                 self.app.setLabelFg("LAB_SENT_STATUS", "green")

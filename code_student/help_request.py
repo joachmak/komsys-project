@@ -10,10 +10,11 @@ class RequestStatus(Enum):
 
 class HelpRequest:
 
-    def __init__(self, module_number: int, task_idx: int, is_online: bool, comment: str):
+    def __init__(self, module_number: int, task_idx: int, is_online: bool, zoom_url: str, comment: str):
         self.module_number = module_number
         self.task_idx = task_idx
         self.is_online = is_online
+        self.zoom_url = zoom_url
         self.comment = comment
         self.status = RequestStatus.UNSENT
         self.queue_pos = -1
