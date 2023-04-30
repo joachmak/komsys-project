@@ -4,9 +4,9 @@ import json
 import code_student.gui_elems as elems
 from enum import Enum
 from uuid import uuid1
-from code_student.group import Group
-from code_student.module import Module
-
+from common.group import Group
+from common.module import Module
+from common.io_utils import import_modules, import_groups
 
 DATA_FILEPATH = path.join("..", "data")
 
@@ -17,30 +17,6 @@ class Scene(Enum):
     GROUPS: int = 2
     SAVE_EDIT_MODULE: int = 3
     SAVE_EDIT_GROUP: int = 4
-
-
-def import_modules():
-    try:
-        with open(path.join(DATA_FILEPATH, "modules.json"), "r") as f:
-            loaded_data = json.load(f)
-            loaded_modules = []
-            for module in loaded_data:
-                loaded_modules.append(Module(module["number"], module["name"], module["task_count"]))
-            return loaded_modules
-    except OSError:
-        return []
-
-
-def import_groups():
-    try:
-        with open(path.join(DATA_FILEPATH, "groups.json"), "r") as f:
-            loaded_data = json.load(f)
-            loaded_modules = []
-            for group in loaded_data:
-                loaded_modules.append(Group(group["number"], group["table"]))
-            return loaded_modules
-    except OSError:
-        return []
 
 
 class UserInterface:

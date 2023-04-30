@@ -5,7 +5,8 @@ import code_student.gui_elems as elems
 from enum import Enum
 from uuid import uuid1
 
-from code_student.module import Module
+from common.io_utils import import_modules, import_groups
+from common.module import Module
 from code_student.request_form import HelpRequest
 
 
@@ -27,11 +28,12 @@ class Scene(Enum):
 
 
 class UserInterface:
-    def __init__(self, modules: list):
+    def __init__(self, modules: list, groups: list):
         self.app = gui("Student Client", "1x1")  # size is set in show_scene() method
         self.mqtt_client = MQTTClient()
         self.current_scene = -1
         self.modules = modules
+        self.groups = groups
         self.logged_in_user = ""
         self.selected_module = 1
         self.selected_task = 1
@@ -93,25 +95,16 @@ class UserInterface:
         if scene == Scene.LOGIN:
             def on_login_click():
                 """ Try logging in """
-                group_name = self.app.getEntry(elems.TXT_GROUP_NAME)
-                if group_name != "":
-                    if not self.mqtt_client.login(group_name):
-                        self.show_error("")
-                    self.logged_in_user = group_name
-                    # TODO: do some MQTT stuff ?
-                    self.show_scene(Scene.MAIN_PAGE)
-                    return
-                self.show_error("Error: Invalid group name")
+                group_name = self.app.getOptionBox("Group")
+                self.logged_in_user = group_name
+                # TODO: do some MQTT stuff ?
+                self.show_scene(Scene.MAIN_PAGE)
 
             self.set_window_size_and_center(500, 100)
             self.app.startLabelFrame("Start")
             self.app.setSticky("nwe")  # on resize, stretch from north-west to east
-            self.app.addLabel("l_group", "Group name", 0, 0)
-            self.app.addEntry(elems.TXT_GROUP_NAME, 0, 1)
-            self.app.addLabel(elems.LAB_ERROR, "Error, something went wrong", 1, 1)
-            self.app.setLabelFg(elems.LAB_ERROR, "red")
-            self.app.hideLabel(elems.LAB_ERROR)
-            self.app.addButton(elems.BTN_LOGIN, on_login_click, 2, 1)
+            self.app.addLabelOptionBox("Group", [f"Group {group.number}, table {group.table}" for group in self.groups])
+            self.app.addButton(elems.BTN_LOGIN, on_login_click, 1, 0)
             self.app.stopLabelFrame()
 
         elif scene == Scene.MAIN_PAGE:
@@ -254,5 +247,4 @@ def create_modules():
 
 
 if __name__ == "__main__":
-    m = create_modules()
-    ui = UserInterface(modules=m)
+    ui = UserInterface(modules=sorted(import_modules(), key=lambda m: m.number), groups=sorted(import_groups(), key=lambda g: g.number))
