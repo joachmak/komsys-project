@@ -1,27 +1,14 @@
-from typing import Optional, List
-
 from appJar import gui
 from os import path
 import json
 import code_student.gui_elems as elems
 from enum import Enum
 from uuid import uuid1
-
 from code_student.group import Group
 from code_student.module import Module
-from code_student.request_form import HelpRequest
 
 
 DATA_FILEPATH = path.join("..", "data")
-
-
-class MQTTClient:
-    def __init__(self):
-        pass
-
-    def login(self, group_name: str) -> bool:
-        """ Try logging in as group. Returns True if succeeded, false otherwise """
-        return False
 
 
 class Scene(Enum):
@@ -59,7 +46,6 @@ def import_groups():
 class UserInterface:
     def __init__(self):
         self.app = gui("Configuration App", "1x1")  # size is set in show_scene() method
-        self.mqtt_client = MQTTClient()
         self.current_scene = -1
         self.modules = import_modules()
         self.groups = import_groups()
