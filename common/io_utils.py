@@ -5,7 +5,7 @@ from common.group import Group
 from common.module import Module
 
 
-DATA_FILEPATH = path.join("..", "data")
+DATA_FILEPATH = path.join("data")
 
 
 def import_modules():

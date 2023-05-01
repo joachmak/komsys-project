@@ -4,6 +4,9 @@ from appJar import gui
 from enum import Enum
 from uuid import uuid1
 
+from stmpy import Machine, Driver
+
+from code_student.stm_utils import get_stm_transitions, get_stm_states
 from common.feedback import Feedback
 from common.io_utils import import_modules, import_groups
 from common.help_request import HelpRequest
@@ -30,6 +33,12 @@ class UserInterface:
     def __init__(self, modules: list, groups: list):
         self.app = gui("Teacher Assistant Client", "1x1")  # size is set in show_scene() method
         self.mqtt_client = MQTTClient()
+
+        self.stm_help_request = Machine(name="stm_help_request", transitions=get_stm_transitions(), obj=self, states=get_stm_states())
+        self.driver = Driver()
+        self.driver.add_machine(self.stm_help_request)
+        self.driver.start()
+
         self.current_scene = -1
         self.modules = modules
         self.groups = groups
@@ -39,6 +48,9 @@ class UserInterface:
         self.selected_task = 1
         self.active_help_request: Optional[HelpRequest] = None
         self.start_app()
+
+    def stm_log(self, text: str):
+        print(text)
 
     def start_app(self):
         """ Set up initial scene """
@@ -160,13 +172,12 @@ class UserInterface:
                     # TODO: validation (e.g. must have zoom link if is_online, must have comment)
                     self.active_help_request = HelpRequest(self.logged_in_group_number, self.selected_module, self.selected_task, is_online,
                                                            zoom_url, comment)
+                    self.stm_help_request.send("click")
                     # TODO: mqtt stuff
-                    print("sending mqtt request")
                     self.active_help_request.queue_pos = 69  # TODO: find queue position
                 else:
-                    # Cancel help request
+                    self.stm_help_request.send("click")
                     # TODO: mqtt stuff
-                    print("sending mqtt request")
                     self.active_help_request = None
                 self.show_scene(Scene.HELP_REQUEST)
 
@@ -274,3 +285,4 @@ class UserInterface:
 if __name__ == "__main__":
     ui = UserInterface(modules=sorted(import_modules(), key=lambda m: m.number),
                        groups=sorted(import_groups(), key=lambda g: g.number))
+    ui.driver.stop()
