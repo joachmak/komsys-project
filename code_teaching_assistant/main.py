@@ -2,7 +2,6 @@ import random
 import json
 from typing import Optional
 from threading import Thread
-#from playsound import playsound
 
 from appJar import gui
 from enum import Enum
@@ -15,7 +14,7 @@ from common.feedback import Feedback
 from common.group import Group
 from common.io_utils import import_modules, import_groups
 from common.help_request import HelpRequest, RequestStatus
-from common.mqtt_utils import parse_help_request
+from common.mqtt_utils import parse_help_request, check_req_type, parse_cancel_request
 import paho.mqtt.client as mqtt
 
 from common.mqtt_utils import BROKER, PORT, TOPIC_QUEUE, TOPIC_TA, RequestWrapper, TYPE_ADD_HELP_REQUEST, \
@@ -29,6 +28,7 @@ class MQTTClient:
         self.stm_teaching_assistant = stm_teaching_assistant
         self.help_requests = help_requests
         self.help_request_to_add = None
+        self.help_request_to_remove = None
        
         print(f"Trying to connect to {BROKER}")
         self.client.connect(BROKER, PORT)
@@ -44,19 +44,18 @@ class MQTTClient:
 
     def on_message(self, client, userdata, msg: mqtt.MQTTMessage):
         print("on_message(): topic: {}, data: {}".format(msg.topic, msg.payload))
-        self.help_request_to_add = parse_help_request(str(msg.payload).replace("\\", ""))
-        self.stm_teaching_assistant.send("sig_help_request")
 
-
-   
+        req_type = check_req_type(str(msg.payload).replace("\\", ""))
+        if req_type == 0:
+            self.help_request_to_add = parse_help_request(str(msg.payload).replace("\\", ""))
+            self.stm_teaching_assistant.send("sig_rec_help_req")
+        elif req_type == 1:
+            self.help_request_to_remove = parse_cancel_request(str(msg.payload).replace("\\", ""))
+            self.stm_teaching_assistant.send("sig_rem_help_req")
         
-        
 
+    
 
-
-
-#(self, group_number: int, module_number: int, task_idx: int, is_online: bool, zoom_url: str, comment: str):
-#{'request_type': 0, 'data': "{'id': '4a3574da-e80e-11ed-a73d-3e22fb8aa57d', 'module_number': 1, 'task_idx': 0, 'is_online': False, 'zoom_url': 'Zoom meeting url (if online)', 'comment': 'What do you need help with?', 'status': <RequestStatus.UNSENT: 0>, 'queue_pos': 69, 'group_number': 1, 'claimed_by': None, 'time': '12:52:39.055797'}"}
 
 class Scene(Enum):
     LOGIN: int = 0
@@ -111,11 +110,11 @@ class UserInterface:
         print(text)
 
 
-    def task_claimed(self):
+    def stm_task_claimed(self):
         #TODO: mqtt stuff
         pass
 
-    def request_resolved(self):
+    def stm_request_resolved(self):
         #TODO: mqtt stuff
         pass
 
@@ -125,14 +124,24 @@ class UserInterface:
         
         self.show_scene(self.current_scene)
 
-    def stm_receive_feedbac(self):
+    def stm_receive_feedback(self):
+        #TODO: Fix this
         pass
 
-    def stm_receive_help_request(self):
+    def stm_rec_help_req(self):
         self.help_requests.append(self.mqtt_client.help_request_to_add)
+       
         if self.current_scene == Scene.MAIN_PAGE:
             self.show_scene(self.current_scene)
-
+    
+    def stm_rem_help_req(self):
+        print(self.help_requests)
+        for i in range (len(self.help_requests)):
+            if self.help_requests[i].id == self.mqtt_client.help_request_to_remove:
+                del self.help_requests[i]
+                break
+        if self.current_scene == Scene.MAIN_PAGE:
+            self.show_scene(self.current_scene)
     
     # =========== UI-controlled methods =========== ""    
 
@@ -300,9 +309,7 @@ class UserInterface:
             def on_resolve_claim():
                 current_request.status = RequestStatus.COMPLETED
                 self.stm_teaching_assistant.send("resolve_button")
-                print("RESOLVED")
-
-                self.active_help_request.claimed_by = None
+            
                 self.active_help_request = None
         
                 self.show_scene(self.current_scene)
