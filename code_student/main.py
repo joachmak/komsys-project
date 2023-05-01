@@ -1,13 +1,12 @@
 from typing import Optional
 
 from appJar import gui
-import code_student.gui_elems as elems
 from enum import Enum
 from uuid import uuid1
 
 from common.feedback import Feedback
 from common.io_utils import import_modules, import_groups
-from code_student.help_request import HelpRequest
+from common.help_request import HelpRequest
 
 
 class MQTTClient:
@@ -29,22 +28,17 @@ class Scene(Enum):
 
 class UserInterface:
     def __init__(self, modules: list, groups: list):
-        self.app = gui("Student Client", "1x1")  # size is set in show_scene() method
+        self.app = gui("Teacher Assistant Client", "1x1")  # size is set in show_scene() method
         self.mqtt_client = MQTTClient()
         self.current_scene = -1
         self.modules = modules
         self.groups = groups
         self.feedback_responses = []
         self.logged_in_user = ""
-        self.logged_in_group_number = -1
         self.selected_module = 1
         self.selected_task = 1
         self.active_help_request: Optional[HelpRequest] = None
         self.start_app()
-
-    def show_error(self, message: str):
-        self.app.setLabel(elems.LAB_ERROR, message)
-        self.app.showLabel(elems.LAB_ERROR)
 
     def start_app(self):
         """ Set up initial scene """
@@ -122,7 +116,8 @@ class UserInterface:
             self.app.startLabelFrame("Start")
             self.app.setSticky("nwe")  # on resize, stretch from north-west to east
             self.app.addLabelOptionBox("Group", [f"Group {group.number}, table {group.table}" for group in self.groups])
-            self.app.addButton(elems.BTN_LOGIN, on_login_click, 1, 0)
+            self.app.addButton("BTN_LOGIN", on_login_click, 1, 0)
+            self.app.setButton("BTN_LOGIN", "Log in")
             self.app.stopLabelFrame()
 
         elif scene == Scene.MAIN_PAGE:
@@ -163,7 +158,7 @@ class UserInterface:
                     is_online = self.app.getCheckBox("Online")
                     zoom_url = self.app.getEntry("TXT_ZOOM")
                     # TODO: validation (e.g. must have zoom link if is_online, must have comment)
-                    self.active_help_request = HelpRequest(self.selected_module, self.selected_task, is_online,
+                    self.active_help_request = HelpRequest(self.logged_in_group_number, self.selected_module, self.selected_task, is_online,
                                                            zoom_url, comment)
                     # TODO: mqtt stuff
                     print("sending mqtt request")

@@ -1,4 +1,6 @@
+from datetime import datetime
 from enum import Enum
+from uuid import uuid1
 
 
 class RequestStatus(Enum):
@@ -10,7 +12,8 @@ class RequestStatus(Enum):
 
 class HelpRequest:
 
-    def __init__(self, module_number: int, task_idx: int, is_online: bool, zoom_url: str, comment: str):
+    def __init__(self, group_number: int, module_number: int, task_idx: int, is_online: bool, zoom_url: str, comment: str):
+        self.id = str(uuid1())
         self.module_number = module_number
         self.task_idx = task_idx
         self.is_online = is_online
@@ -18,6 +21,9 @@ class HelpRequest:
         self.comment = comment
         self.status = RequestStatus.UNSENT
         self.queue_pos = -1
+        self.group_number = group_number
+        self.claimed_by = None
+        self.time = str(datetime.now().time())
 
     def send_request(self):
         # TODO: send to some topic through MQTT

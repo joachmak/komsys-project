@@ -1,7 +1,6 @@
 from appJar import gui
 from os import path
 import json
-import code_student.gui_elems as elems
 from enum import Enum
 from uuid import uuid1
 from common.group import Group
@@ -30,8 +29,8 @@ class UserInterface:
         self.start_app()
 
     def show_error(self, message: str):
-        self.app.setLabel(elems.LAB_ERROR, message)
-        self.app.showLabel(elems.LAB_ERROR)
+        self.app.setLabel("lab_error", message)
+        self.app.showLabel("lab_error")
 
     def start_app(self):
         """ Set up initial scene """
