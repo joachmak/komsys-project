@@ -13,7 +13,8 @@ from common.io_utils import import_modules, import_groups
 from common.help_request import HelpRequest
 import paho.mqtt.client as mqtt
 
-from common.mqtt_utils import BROKER, PORT, TOPIC_QUEUE, TOPIC_TA
+from common.mqtt_utils import BROKER, PORT, TOPIC_QUEUE, TOPIC_TA, RequestWrapper, TYPE_ADD_HELP_REQUEST, \
+    TYPE_CANCEL_HELP_REQUEST
 
 
 class MQTTClient:
@@ -39,12 +40,14 @@ class MQTTClient:
     def request_help(self, request: HelpRequest) -> bool:
         """ Send help request """
         print(f"Sending help request")
-        return self.client.publish(TOPIC_TA, payload=request.payload()).is_published()
+        req_body = RequestWrapper(TYPE_ADD_HELP_REQUEST, request.payload()).payload()
+        return self.client.publish(TOPIC_TA, payload=req_body).is_published()
 
     def cancel_request(self, request_id: str) -> bool:
         """ Cancel help request by id """
         print(f"Cancelling help request with id {request_id}")
-        return True
+        req_body = RequestWrapper(TYPE_CANCEL_HELP_REQUEST, str({"id": request_id})).payload()
+        return self.client.publish(TOPIC_TA, payload=req_body).is_published()
 
 
 class Scene(Enum):
@@ -91,8 +94,6 @@ class UserInterface:
             if self.current_scene == Scene.HELP_REQUEST:
                 # if user is watching the help request page, refresh the scene
                 self.show_scene(self.current_scene)
-        else:
-            print("Successful MQTT ")
 
     def stm_cancel_help_request(self):
         # take active help request send mqtt request cancelling the help request
@@ -228,7 +229,6 @@ class UserInterface:
                 else:
                     self.stm_help_request.send("click")
                     # TODO: mqtt stuff
-                    self.active_help_request = None
                 self.show_scene(Scene.HELP_REQUEST)
 
             self.set_window_size_and_center(500, 300)

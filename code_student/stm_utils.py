@@ -13,7 +13,8 @@ def get_stm_transitions():
     t2 = {
         "source": "sent",
         "target": "unsent",
-        "trigger": "click"
+        "trigger": "click",
+        "effect": "stm_cancel_help_request"
     }
     t3 = {
         "source": "sent",
