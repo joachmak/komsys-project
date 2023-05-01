@@ -25,7 +25,6 @@ class HelpRequest:
         self.claimed_by = None
         self.time = str(datetime.now().time())
 
-    def send_request(self):
-        # TODO: send to some topic through MQTT
-        self.status = RequestStatus.SENT
+    def payload(self):
+        return str(vars(self))
 

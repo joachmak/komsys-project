@@ -1,10 +1,11 @@
 import json
-from os import path
+from os import path, chdir
 
 from common.group import Group
 from common.module import Module
 
 
+chdir(path.join(path.dirname(path.abspath(__file__)), ".."))  # set root to project dir
 DATA_FILEPATH = path.join("data")
 
 

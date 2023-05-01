@@ -7,7 +7,8 @@ def get_stm_transitions():
     t1 = {
         "source": "unsent",
         "target": "sent",
-        "trigger": "click"
+        "trigger": "click",
+        "effect": "stm_request_help"
     }
     t2 = {
         "source": "sent",
@@ -50,7 +51,7 @@ def get_stm_transitions():
 def get_stm_states():
     unsent = {
         "name": "unsent",
-        "entry": "stm_log('unsent')"
+        "entry": "stm_log('unsent');"
     }
     sent = {
         "name": "sent",

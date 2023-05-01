@@ -17,6 +17,7 @@ class MQTTClient:
 
     def login(self, group_name: str) -> bool:
         """ Try logging in as group. Returns True if succeeded, false otherwise """
+        print("CALLED THE LOGIN METHOD")
         return False
 
 

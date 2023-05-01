@@ -1,3 +1,4 @@
+from threading import Thread
 from typing import Optional
 
 from appJar import gui
@@ -10,15 +11,40 @@ from code_student.stm_utils import get_stm_transitions, get_stm_states
 from common.feedback import Feedback
 from common.io_utils import import_modules, import_groups
 from common.help_request import HelpRequest
+import paho.mqtt.client as mqtt
+
+from common.mqtt_utils import BROKER, PORT, TOPIC_QUEUE, TOPIC_TA
 
 
 class MQTTClient:
     def __init__(self):
-        pass
+        self.client = mqtt.Client()
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
+        print(f"Trying to connect to {BROKER}")
+        self.client.connect(BROKER, PORT)
+        self.client.subscribe(TOPIC_QUEUE)
+        try:
+            thread = Thread(target=self.client.loop_forever)
+            thread.start()
+        except KeyboardInterrupt:
+            self.client.disconnect()
 
-    def login(self, group_name: str) -> bool:
-        """ Try logging in as group. Returns True if succeeded, false otherwise """
-        return False
+    def on_connect(self, client, userdata, flags, rc):
+        print(format(mqtt.connack_string(rc)))
+
+    def on_message(self, client, userdata, msg: mqtt.MQTTMessage):
+        print("on_message(): topic: {}, data: {}".format(msg.topic, msg.payload))
+
+    def request_help(self, request: HelpRequest) -> bool:
+        """ Send help request """
+        print(f"Sending help request")
+        return self.client.publish(TOPIC_TA, payload=request.payload()).is_published()
+
+    def cancel_request(self, request_id: str) -> bool:
+        """ Cancel help request by id """
+        print(f"Cancelling help request with id {request_id}")
+        return True
 
 
 class Scene(Enum):
@@ -37,7 +63,6 @@ class UserInterface:
         self.stm_help_request = Machine(name="stm_help_request", transitions=get_stm_transitions(), obj=self, states=get_stm_states())
         self.driver = Driver()
         self.driver.add_machine(self.stm_help_request)
-        self.driver.start()
 
         self.current_scene = -1
         self.modules = modules
@@ -47,11 +72,36 @@ class UserInterface:
         self.selected_module = 1
         self.selected_task = 1
         self.active_help_request: Optional[HelpRequest] = None
+        self.driver.start()
         self.start_app()
 
+    # ======== STM-controlled methods ========
     def stm_log(self, text: str):
+        print(self.current_scene)
         print(text)
 
+    def stm_request_help(self):
+        # take active help request and send mqtt requests
+        print("inside stm method for sending request")
+        success = self.mqtt_client.request_help(self.active_help_request)
+        # if mqtt request fails, set it to None and refresh scene
+        if not success:
+            print("MQTT request failed!")
+            self.active_help_request = None
+            if self.current_scene == Scene.HELP_REQUEST:
+                # if user is watching the help request page, refresh the scene
+                self.show_scene(self.current_scene)
+        else:
+            print("Successful MQTT ")
+
+    def stm_cancel_help_request(self):
+        # take active help request send mqtt request cancelling the help request
+        success = self.mqtt_client.cancel_request(self.active_help_request.id)
+        if success:
+            self.active_help_request = None
+            self.show_scene(self.current_scene)
+
+    # ======== UI-controlled methods ========
     def start_app(self):
         """ Set up initial scene """
         self.app.setGuiPadding(5, 5)
@@ -286,3 +336,4 @@ if __name__ == "__main__":
     ui = UserInterface(modules=sorted(import_modules(), key=lambda m: m.number),
                        groups=sorted(import_groups(), key=lambda g: g.number))
     ui.driver.stop()
+    ui.mqtt_client.client.disconnect()
