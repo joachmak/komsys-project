@@ -1,5 +1,8 @@
 import random
+import json
 from typing import Optional
+from threading import Thread
+#from playsound import playsound
 
 from appJar import gui
 from enum import Enum
@@ -12,17 +15,48 @@ from common.feedback import Feedback
 from common.group import Group
 from common.io_utils import import_modules, import_groups
 from common.help_request import HelpRequest, RequestStatus
+from common.mqtt_utils import parse_help_request
+import paho.mqtt.client as mqtt
 
+from common.mqtt_utils import BROKER, PORT, TOPIC_QUEUE, TOPIC_TA, RequestWrapper, TYPE_ADD_HELP_REQUEST, \
+    TYPE_CANCEL_HELP_REQUEST
 
 class MQTTClient:
-    def __init__(self):
-        pass
+    def __init__(self, stm_teaching_assistant, help_requests:list):
+        self.client = mqtt.Client()
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
+        self.stm_teaching_assistant = stm_teaching_assistant
+        self.help_requests = help_requests
+        self.help_request_to_add = None
+       
+        print(f"Trying to connect to {BROKER}")
+        self.client.connect(BROKER, PORT)
+        self.client.subscribe(TOPIC_QUEUE)
+        try:
+            thread = Thread(target=self.client.loop_forever)
+            thread.start()
+        except KeyboardInterrupt:
+            self.client.disconnect()
 
-    def login(self, group_name: str) -> bool:
-        """ Try logging in as group. Returns True if succeeded, false otherwise """
-        print("CALLED THE LOGIN METHOD")
-        return False
+    def on_connect(self, client, userdata, flags, rc):
+        print(format(mqtt.connack_string(rc)))
 
+    def on_message(self, client, userdata, msg: mqtt.MQTTMessage):
+        print("on_message(): topic: {}, data: {}".format(msg.topic, msg.payload))
+        self.help_request_to_add = parse_help_request(str(msg.payload).replace("\\", ""))
+        self.stm_teaching_assistant.send("sig_help_request")
+
+
+   
+        
+        
+
+
+
+
+#(self, group_number: int, module_number: int, task_idx: int, is_online: bool, zoom_url: str, comment: str):
+#{'request_type': 0, 'data': "{'id': '4a3574da-e80e-11ed-a73d-3e22fb8aa57d', 'module_number': 1, 'task_idx': 0, 'is_online': False, 'zoom_url': 'Zoom meeting url (if online)', 'comment': 'What do you need help with?', 'status': <RequestStatus.UNSENT: 0>, 'queue_pos': 69, 'group_number': 1, 'claimed_by': None, 'time': '12:52:39.055797'}"}
 
 class Scene(Enum):
     LOGIN: int = 0
@@ -35,12 +69,15 @@ class Scene(Enum):
 class UserInterface:
     def __init__(self, modules: list, groups: list):
         self.app = gui("Teacher Assistant Client", "1x1")  # size is set in show_scene() method
-        self.mqtt_client = MQTTClient()
+        self.help_requests = []
+        
 
         self.stm_teaching_assistant = Machine(name="stm_teaching_assistant", transitions=get_stm_transitions(), obj=self, states=get_stm_states())
         self.driver = Driver()
         self.driver.add_machine(self.stm_teaching_assistant)
         self.driver.start()
+
+        self.mqtt_client = MQTTClient(self.stm_teaching_assistant, self.help_requests)
 
         self.current_scene = -1
         self.modules = modules
@@ -87,6 +124,15 @@ class UserInterface:
         self.active_help_request = None
         
         self.show_scene(self.current_scene)
+
+    def stm_receive_feedbac(self):
+        pass
+
+    def stm_receive_help_request(self):
+        self.help_requests.append(self.mqtt_client.help_request_to_add)
+        if self.current_scene == Scene.MAIN_PAGE:
+            self.show_scene(self.current_scene)
+
     
     # =========== UI-controlled methods =========== ""    
 
@@ -149,6 +195,7 @@ class UserInterface:
         self.current_scene = scene
         if scene == Scene.LOGIN:
             def on_login_click():
+
                 """ Try logging in """
                 name = self.app.getEntry("TXT_NAME")
                 if name == "":
