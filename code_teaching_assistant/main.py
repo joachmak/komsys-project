@@ -149,7 +149,7 @@ class UserInterface:
             def add_help_request_frame(_request: HelpRequest):
                 self.app.addLabel(
                     f"LAB_GROUP_{_request.id}",
-                    f"{_request.queue_pos}: Group {_request.group_number}, module {_request.module_number}, task {_request.task_idx}, time "
+                    f"{_request.queue_pos}: Group {_request.group_number}, module {_request.module_number}, task {_request.task_idx + 1}, time "
                     f"{str(_request.time).split('.')[0]}",
                     column=0, row=self.app.getRow())
                 self.app.addButton(f"{_request.id}", see_request, column=1, row=self.app.getRow()-1)
@@ -180,7 +180,7 @@ class UserInterface:
             self.app.setTabbedFrameSelectedTab("ModuleTabFrame", str(self.selected_module))
             self.app.stopLabelFrame()
 
-            self.app.startLabelFrame("Unclaimed help requests", sticky="news", row=5, rowspan=5, column=1, colspan=3)
+            self.app.startLabelFrame("Unresolved help requests", sticky="news", row=5, rowspan=5, column=1, colspan=3)
             self.app.startScrollPane("PANE_HELP_REQUESTS")
             for request in self.help_requests:
                 if request.status != RequestStatus.COMPLETED:
@@ -225,19 +225,20 @@ class UserInterface:
             self.app.addLabel("LAB_COMMENT", text=f""" "{current_request.comment}" """)
             self.app.addLabel("LAB_GROUP", text=f"- Group {request_group.number}, table {request_group.table}")
             self.app.addLabel("LAB_EMPTY", text="")
+            self.app.addLabel("LAB_MODULE_AND_TASK", text=f"Module {current_request.module_number}, task {current_request.task_idx + 1}")
             self.app.addLabel("LAB_IS_ONLINE", text=f"Online? {'Yes' if current_request.is_online else 'No'}")
             self.app.addLabel("LAB_ZOOM_URL", text=f"Zoom link: {'Not provided' if current_request.zoom_url == '' else current_request.zoom_url}")
             self.app.addLabel("LAB_CLAIMED", text=f"Claimed by: {'Nobody' if current_request.claimed_by is None else current_request.claimed_by}")
             if current_request.status == RequestStatus.COMPLETED:
-                self.app.addLabel("LAB_COMPLETED", "This task has been completed.")
+                self.app.addLabel("LAB_COMPLETED", "This request has been resolved.")
                 self.app.stopLabelFrame()
                 return
             self.app.addButton("BTN_CLAIM", on_claim)
+            self.app.addButton("BTN_RESOLVE", on_resolve_claim).config(text="Resolve")
             if current_request.claimed_by is None:
                 self.app.setButton("BTN_CLAIM", "Claim")
             elif current_request.claimed_by == self.logged_in_user:
                 self.app.setButton("BTN_CLAIM", "Cancel claim")
-                self.app.addButton("BTN_RESOLVE", on_resolve_claim).config(text="Resolve")
             else:
                 self.app.setButton("BTN_CLAIM", "Claim")
                 self.app.disableButton("BTN_CLAIM")
@@ -247,8 +248,10 @@ class UserInterface:
         elif scene == Scene.TASK_MENU:
             # gather data for display
             ratings = {"Easy": 0, "Medium": 0, "Hard": 0}
+            feedback_for_this_task = []
             for feedback in self.feedback_responses:
                 if feedback.module_number == self.selected_module and feedback.task_number == self.selected_task:
+                    feedback_for_this_task.append(feedback)
                     ratings[feedback.difficulty] += 1
             groups_completed = ratings["Easy"] + ratings["Medium"] + ratings["Hard"]
             groups_completed_percent = 0
@@ -257,7 +260,7 @@ class UserInterface:
                 groups_completed_percent = round(groups_completed * 100 / len(self.groups), 2)
                 avg_rating = (ratings["Easy"] + (2 * ratings["Medium"]) + (3 * ratings["Hard"])) / groups_completed
 
-            self.set_window_size_and_center(500, 250)
+            self.set_window_size_and_center(500, 350)
             add_side_menu(lambda x: self.show_scene(Scene.MAIN_PAGE))
             self.app.startLabelFrame(f"Feedback for task {self.selected_task + 1} module {self.selected_module}",
                                      sticky="news", row=0, rowspan=6, column=1, colspan=3)
@@ -265,7 +268,11 @@ class UserInterface:
             self.app.addLabel("LAB_RATINGS_TITLE", text="Ratings:")
             self.app.addLabel("LAB_RATINGS", text=f"Easy: {ratings['Easy']}, Medium: {ratings['Medium']}, Hard: {ratings['Hard']}")
             self.app.addLabel("LAB_AVERAGE_RATING", text=f"Average rating: {round(avg_rating, 2)}")
-            add_whitespace(10, 5)
+
+            self.app.startScrollPane("PANE_FEEDBACK")
+            for feedback in feedback_for_this_task:
+                self.app.addLabel(str(uuid1()), f""" "{feedback.comment}"\n-Group {feedback.group_number} """)
+            self.app.stopScrollPane()
             self.app.stopLabelFrame()
         else:
             pass
