@@ -13,7 +13,7 @@ def get_stm_transitions():
         "source": "waiting",
         "target": "unclaimed",
         "trigger": "t",
-        "effect": "timer_expired"
+        "effect": "stm_timer_expired"
     }
     t3 = {
         "source": "waiting",
@@ -43,20 +43,23 @@ def get_stm_states():
         "name": "unclaimed",
         "entry": "stm_log('unclaimed');",
         "sig_feedback": "stm_receive_feedback",
-        "sig_help_request": "stm_receive_help_request"
+        "sig_rec_help_req": "stm_rec_help_req",
+        "sig_rem_help_req": "stm_rem_help_req"
     }
     waiting = {
         "name": "waiting",
-        "entry": "stm_log('waiting'); start_timer('t', 5000); task_claimed",
+        "entry": "stm_log('waiting'); start_timer('t', 5000); stm_task_claimed",
         "sig_feedback": "stm_receive_feedback",
-        "sig_help_request": "stm_receive_help_request"
+        "sig_rec_help_req": "stm_rec_help_req",
+        "sig_rem_help_req": "stm_rem_help_req"
     }
     claimed = {
         "name": "claimed",
         "entry": "stm_log('claimed')",
-        "exit": "request_resolved",
+        "exit": "stm_request_resolved",
         "sig_feedback": "stm_receive_feedback",
-        "sig_help_request": "stm_receive_help_request"
+        "sig_rec_help_req": "stm_rec_help_req",
+        "sig_rem_help_req": "stm_rem_help_req"
     }
     return [unclaimed, waiting, claimed]
 
