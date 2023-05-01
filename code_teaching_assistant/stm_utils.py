@@ -41,16 +41,22 @@ def get_stm_transitions():
 def get_stm_states():
     unclaimed = {
         "name": "unclaimed",
-        "entry": "stm_log('unclaimed');"
+        "entry": "stm_log('unclaimed');",
+        "sig_feedback": "stm_receive_feedback",
+        "sig_help_request": "stm_receive_help_request"
     }
     waiting = {
         "name": "waiting",
-        "entry": "stm_log('waiting'); start_timer('t', 5000); task_claimed"
+        "entry": "stm_log('waiting'); start_timer('t', 5000); task_claimed",
+        "sig_feedback": "stm_receive_feedback",
+        "sig_help_request": "stm_receive_help_request"
     }
     claimed = {
         "name": "claimed",
         "entry": "stm_log('claimed')",
-        "exit": "request_resolved"
+        "exit": "request_resolved",
+        "sig_feedback": "stm_receive_feedback",
+        "sig_help_request": "stm_receive_help_request"
     }
     return [unclaimed, waiting, claimed]
 
