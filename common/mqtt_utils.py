@@ -22,6 +22,13 @@ def parse_help_request(message: str) -> HelpRequest:
     return HelpRequest(data["group_number"], data["module_number"], data["task_idx"], data["is_online"],
                        data["zoom_url"], data["comment"], data["id"])
 
+
+def parse_cancel_request(message: str) -> str:
+    """ Returns id of request to cancel """
+    data = json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))
+    return data["id"]
+
+
 class RequestWrapper:
     def __init__(self, request_type: int, data: str):
         self.request_type = request_type

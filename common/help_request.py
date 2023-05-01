@@ -13,7 +13,7 @@ class RequestStatus(Enum):
 class HelpRequest:
 
     def __init__(self, group_number: int, module_number: int, task_idx: int, is_online: bool, zoom_url: str, comment: str, _id=None):
-        self.id = str(uuid1()) if _id is not None else _id
+        self.id = str(uuid1()) if _id is None else _id
         self.module_number = module_number
         self.task_idx = task_idx
         self.is_online = is_online

@@ -50,7 +50,6 @@ class MQTTClient:
             request: HelpRequest = parse_help_request(str(msg.payload).replace("\\", ""))
             print(request.id)
 
-
     def request_help(self, request: HelpRequest) -> bool:
         """ Send help request """
         print(f"Sending help request")
@@ -91,6 +90,7 @@ class UserInterface:
         self.active_help_request: Optional[HelpRequest] = None
         self.driver.start()
         self.start_app()
+        self.logged_in_group_number = -1
 
     # ======== STM-controlled methods ========
     def stm_log(self, text: str):
