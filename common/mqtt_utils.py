@@ -1,3 +1,7 @@
+import json
+
+from common.help_request import HelpRequest
+
 BROKER = "mqtt20.iik.ntnu.no"  # https://github.com/mqtt/mqtt.org/wiki/public_brokers
 PORT = 1883
 
@@ -11,6 +15,12 @@ TOPIC_SERVER = TOPIC_BASE + "server"
 TYPE_ADD_HELP_REQUEST = 0
 TYPE_CANCEL_HELP_REQUEST = 1
 
+
+def parse_help_request(message: str) -> HelpRequest:
+    data = json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))
+    data["is_online"] = bool(data["is_online"])
+    return HelpRequest(data["group_number"], data["module_number"], data["task_idx"], data["is_online"],
+                       data["zoom_url"], data["comment"], data["id"])
 
 class RequestWrapper:
     def __init__(self, request_type: int, data: str):

@@ -1,3 +1,4 @@
+import json
 from threading import Thread
 from typing import Optional
 
@@ -14,16 +15,23 @@ from common.help_request import HelpRequest
 import paho.mqtt.client as mqtt
 
 from common.mqtt_utils import BROKER, PORT, TOPIC_QUEUE, TOPIC_TA, RequestWrapper, TYPE_ADD_HELP_REQUEST, \
-    TYPE_CANCEL_HELP_REQUEST
+    TYPE_CANCEL_HELP_REQUEST, TOPIC_BASE, parse_help_request
+
+
+def clear_retained_messages(client: mqtt.Client):
+    client.publish(TOPIC_QUEUE, payload=None, retain=True)
+    client.publish(TOPIC_TA, payload=None, retain=True)
 
 
 class MQTTClient:
     def __init__(self):
         self.client = mqtt.Client()
+        self.queue_pos = 1
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
         print(f"Trying to connect to {BROKER}")
-        self.client.connect(BROKER, PORT)
+        self.client.connect(BROKER, PORT)  # Remove in prod
+        #clear_retained_messages(self.client)
         self.client.subscribe(TOPIC_QUEUE)
         try:
             thread = Thread(target=self.client.loop_forever)
@@ -36,18 +44,24 @@ class MQTTClient:
 
     def on_message(self, client, userdata, msg: mqtt.MQTTMessage):
         print("on_message(): topic: {}, data: {}".format(msg.topic, msg.payload))
+        request_type = int(str(msg.payload).split(": ")[1][0])
+        if request_type == 0:
+            # Add HelpRequest
+            request: HelpRequest = parse_help_request(str(msg.payload).replace("\\", ""))
+            print(request.id)
+
 
     def request_help(self, request: HelpRequest) -> bool:
         """ Send help request """
         print(f"Sending help request")
         req_body = RequestWrapper(TYPE_ADD_HELP_REQUEST, request.payload()).payload()
-        return self.client.publish(TOPIC_TA, payload=req_body).is_published()
+        return self.client.publish(TOPIC_QUEUE, payload=req_body).is_published()
 
     def cancel_request(self, request_id: str) -> bool:
         """ Cancel help request by id """
         print(f"Cancelling help request with id {request_id}")
         req_body = RequestWrapper(TYPE_CANCEL_HELP_REQUEST, str({"id": request_id})).payload()
-        return self.client.publish(TOPIC_TA, payload=req_body).is_published()
+        return self.client.publish(TOPIC_QUEUE, payload=req_body).is_published()
 
 
 class Scene(Enum):
@@ -63,7 +77,7 @@ class UserInterface:
         self.app = gui("Teacher Assistant Client", "1x1")  # size is set in show_scene() method
         self.mqtt_client = MQTTClient()
 
-        self.stm_help_request = Machine(name="stm_help_request", transitions=get_stm_transitions(), obj=self, states=get_stm_states())
+        self.stm_help_request = Machine(name="stm_student_help_request", transitions=get_stm_transitions(), obj=self, states=get_stm_states())
         self.driver = Driver()
         self.driver.add_machine(self.stm_help_request)
 
