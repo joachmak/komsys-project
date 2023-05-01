@@ -5,6 +5,9 @@ from appJar import gui
 from enum import Enum
 from uuid import uuid1
 
+from stmpy import Machine, Driver
+
+from code_teaching_assistant.stm_utils import get_stm_transitions, get_stm_states
 from common.feedback import Feedback
 from common.group import Group
 from common.io_utils import import_modules, import_groups
@@ -33,6 +36,12 @@ class UserInterface:
     def __init__(self, modules: list, groups: list):
         self.app = gui("Teacher Assistant Client", "1x1")  # size is set in show_scene() method
         self.mqtt_client = MQTTClient()
+
+        self.stm_teaching_assistant = Machine(name="stm_teaching_assistant", transitions=get_stm_transitions(), obj=self, states=get_stm_states())
+        self.driver = Driver()
+        self.driver.add_machine(self.stm_teaching_assistant)
+        self.driver.start()
+
         self.current_scene = -1
         self.modules = modules
         self.groups = groups
@@ -58,6 +67,28 @@ class UserInterface:
         self.selected_help_request: str = ""
         self.active_help_request: Optional[HelpRequest] = None
         self.start_app()
+
+    # =========== STM-controlled methods =========== ""
+
+    def stm_log(self, text: str):
+        print(text)
+
+
+    def task_claimed(self):
+        #TODO: mqtt stuff
+        pass
+
+    def request_resolved(self):
+        #TODO: mqtt stuff
+        pass
+
+    def timer_expired(self):
+        self.active_help_request.claimed_by = None
+        self.active_help_request = None
+        
+        self.show_scene(self.current_scene)
+    
+    # =========== UI-controlled methods =========== ""    
 
     def start_app(self):
         """ Set up initial scene """
@@ -209,15 +240,24 @@ class UserInterface:
                     current_request.claimed_by = self.logged_in_user  # claim
                     current_request.status = RequestStatus.CONFIRMED
                     self.active_help_request = current_request
-                    self.show_scene(self.current_scene)
+                    self.stm_teaching_assistant.send("claim_button")
+
                 else:
                     current_request.claimed_by = None  # cancel claim
                     current_request.status = RequestStatus.SENT
                     self.active_help_request = None
-                    self.show_scene(self.current_scene)
+                    self.stm_teaching_assistant.send("cancel_claim")
+                self.show_scene(self.current_scene)
+
 
             def on_resolve_claim():
                 current_request.status = RequestStatus.COMPLETED
+                self.stm_teaching_assistant.send("resolve_button")
+                print("RESOLVED")
+
+                self.active_help_request.claimed_by = None
+                self.active_help_request = None
+        
                 self.show_scene(self.current_scene)
 
             self.set_window_size_and_center(500, 250)
@@ -282,3 +322,4 @@ class UserInterface:
 if __name__ == "__main__":
     ui = UserInterface(modules=sorted(import_modules(), key=lambda m: m.number),
                        groups=sorted(import_groups(), key=lambda g: g.number))
+    ui.driver.stop()
