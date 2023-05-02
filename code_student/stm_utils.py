@@ -56,7 +56,8 @@ def get_stm_states():
         "name": "sent",
         "entry": "stm_log('sent')",
         "sig_receive_request_claim": "stm_receive_request_claim",
-        "sig_receive_request_resolution": "stm_receive_request_resolution"
+        "sig_receive_request_resolution": "stm_receive_request_resolution",
+        "sig_update_queue_pos": "stm_update_queue_pos"
     }
     confirmed = {
         "name": "confirmed",
