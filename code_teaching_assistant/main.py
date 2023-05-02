@@ -75,6 +75,19 @@ class MQTTClient:
                         request.claimed_by = ta
                         self.stm_teaching_assistant.send("sig_update_feedback")
                         break
+        elif req_type == TYPE_RESOLVE_REQUEST:
+            print("Received request resolution message")
+            req_id = parse_body_field(payload, "id")
+            rec_to_del = None
+            for req in self.help_requests:
+                if req.id == req_id:
+                    rec_to_del = req
+            try:
+                self.help_requests.remove(rec_to_del)
+            except ValueError:
+                pass
+            if rec_to_del is not None and self.logged_in_ta != rec_to_del.claimed_by:
+                self.stm_teaching_assistant.send("sig_update_feedback")
 
 
     def claim_request(self, request: HelpRequest, ta_name: str) -> bool:
