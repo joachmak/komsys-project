@@ -195,15 +195,17 @@ class UserInterface:
         self.app.addEntry(f"MOD{module}_TASK{task}")
         self.app.setEntryDefault(f"MOD{module}_TASK{task}", "Comment...")
 
-    def set_window_size_and_center(self, x: int, y: int):
+    def set_window_size_and_center(self, x: int, y: int, center=False):
         """ Resize and center window """
         screen_width = self.app.topLevel.winfo_screenwidth()
         screen_height = self.app.topLevel.winfo_screenheight()
 
         window_x = (screen_width - x) // 2
         window_y = (screen_height - y) // 2
-
-        self.app.topLevel.geometry(f"{x}x{y}+{window_x}+{window_y}")
+        if center:
+            self.app.topLevel.geometry(f"{x}x{y}+{window_x}+{window_y}")
+        else:
+            self.app.topLevel.geometry(f"{x}x{y}")
 
     def show_scene(self, scene: int):
         def add_whitespace(desired_row_count: int, current_row_count: int):
@@ -310,14 +312,26 @@ class UserInterface:
                 self.app.setTextArea("LAB_COMMENT", text="What do you need help with?")
                 self.app.setLabel("LAB_SENT_STATUS", text="Request status: NOT SENT")
                 self.app.setLabelFg("LAB_SENT_STATUS", "red")
-            else:
+            elif self.active_help_request.claimed_by == "":
                 self.app.setTextArea("LAB_COMMENT", text=self.active_help_request.comment)
                 self.app.setCheckBox("Online", ticked=self.active_help_request.is_online)
                 self.app.setEntry("TXT_ZOOM", text=self.active_help_request.zoom_url)
                 self.app.setLabel("LAB_SENT_STATUS", text="Request status: SENT")
                 self.app.setButton("BTN_SUBMIT", "Cancel help request")
-                self.app.setLabelFg("LAB_SENT_STATUS", "green")
+                self.app.setLabelFg("LAB_SENT_STATUS", "orange")
                 self.app.addLabel("LAB_QUEUE_POS", text=f"Position in queue: {self.active_help_request.queue_pos}")
+            else:
+                self.app.setTextArea("LAB_COMMENT", text=self.active_help_request.comment)
+                self.app.setCheckBox("Online", ticked=self.active_help_request.is_online)
+                self.app.setEntry("TXT_ZOOM", text=self.active_help_request.zoom_url)
+                self.app.disableTextArea("LAB_COMMENT")
+                self.app.disableCheckBox("Online")
+                self.app.disableEntry("TXT_ZOOM")
+                self.app.setLabel("LAB_SENT_STATUS", text=f"Request status: CONFIRMED by {self.active_help_request.claimed_by}")
+                self.app.setLabelFg("LAB_SENT_STATUS", "green")
+                self.app.setButton("BTN_SUBMIT", "Cancel help request")
+                self.app.disableButton("BTN_SUBMIT")
+
             self.app.stopLabelFrame()
 
         elif scene == Scene.MARK_TASK_AS_DONE:

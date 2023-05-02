@@ -180,15 +180,17 @@ class UserInterface:
             return
         self.feedback_responses[feedback_idx] = feedback  # exists, replace
 
-    def set_window_size_and_center(self, x: int, y: int):
+    def set_window_size_and_center(self, x: int, y: int, center=False):
         """ Resize and center window """
         screen_width = self.app.topLevel.winfo_screenwidth()
         screen_height = self.app.topLevel.winfo_screenheight()
 
         window_x = (screen_width - x) // 2
         window_y = (screen_height - y) // 2
-
-        self.app.topLevel.geometry(f"{x}x{y}+{window_x}+{window_y}")
+        if center:
+            self.app.topLevel.geometry(f"{x}x{y}+{window_x}+{window_y}")
+        else:
+            self.app.topLevel.geometry(f"{x}x{y}")
 
     def show_scene(self, scene: int):
         def add_whitespace(desired_row_count: int, current_row_count: int):
