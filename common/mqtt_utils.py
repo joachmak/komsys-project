@@ -34,7 +34,6 @@ def parse_help_request(message: str) -> HelpRequest:
     return HelpRequest(data["group_number"], data["module_number"], data["task_idx"], data["is_online"],
                        data["zoom_url"], data["comment"], data["id"])
 
-
 def parse_cancel_request(message: str) -> str:
     """ Returns id of request to cancel """
     return json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))["id"]
@@ -49,6 +48,11 @@ def parse_claim_request(message: str) -> (str, str):
     """ Return (request_id, ta_name) """
     data = json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))
     return data["id"], data["ta"]
+
+
+def parse_resolve_request(message: str) -> str:
+    """ Returns id of request to resolve. """
+    return json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))["id"]
 
 
 def parse_confirm_claim(message: str) -> str:

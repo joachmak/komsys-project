@@ -14,8 +14,8 @@ from common.help_request import HelpRequest
 import paho.mqtt.client as mqtt
 
 from common.mqtt_utils import BROKER, PORT, TOPIC_QUEUE, TOPIC_TA, RequestWrapper, TYPE_ADD_HELP_REQUEST, \
-    TYPE_CANCEL_HELP_REQUEST, TOPIC_BASE, parse_help_request, TYPE_SEND_FEEDBACK, TOPIC_TASK, TYPE_CLAIM_REQUEST, \
-    parse_claim_request, TYPE_CONFIRM_CLAIM
+    TYPE_CANCEL_HELP_REQUEST, parse_help_request, TYPE_SEND_FEEDBACK, TOPIC_TASK, TYPE_CLAIM_REQUEST, \
+    parse_claim_request, TYPE_CONFIRM_CLAIM, TYPE_RESOLVE_REQUEST, parse_resolve_request
 
 
 def clear_retained_messages(client: mqtt.Client):
@@ -36,6 +36,7 @@ class MQTTClient:
         self.client.subscribe(TOPIC_QUEUE)
         self.ta_claiming_request = None
         self.request_claimed = None
+        self.request_to_resolve = None
         try:
             thread = Thread(target=self.client.loop_forever)
             thread.start()
@@ -65,6 +66,9 @@ class MQTTClient:
             self.ta_claiming_request = ta_name
             self.request_claimed = request_id
             self.stm.send("sig_receive_request_claim")
+        elif request_type == TYPE_RESOLVE_REQUEST:
+            self.request_to_resolve = parse_resolve_request(payload)
+            self.stm.send("sig_receive_request_resolution")
 
 
     def request_help(self, request: HelpRequest) -> bool:
@@ -152,6 +156,7 @@ class UserInterface:
             self.mqtt_client.request_claimed = None
             return
         if self.active_help_request.claimed_by == "":
+            self.stm_help_request.send("sig_claim")
             ta = self.mqtt_client.ta_claiming_request
             print(f"Ta {ta} wants to claim current help request, and we're gonna let him")
             if self.mqtt_client.confirm_claim(ta):
@@ -162,7 +167,17 @@ class UserInterface:
         print("Hmm, none of the ifs were triggered...")
         print(f"Active help request is claimed by: {self.active_help_request.claimed_by}")
 
-
+    def stm_receive_request_resolution(self):
+        if self.active_help_request is None or self.mqtt_client.request_to_resolve != self.active_help_request.id:
+            return
+        self.stm_help_request.send("sig_resolve")
+        self.mqtt_client.request_to_resolve = None
+        self.mqtt_client.ta_claiming_request = None
+        old_hr = self.active_help_request
+        self.active_help_request = None
+        if self.current_scene == Scene.HELP_REQUEST and self.selected_module == old_hr.module_number \
+                and self.selected_task == old_hr.task_idx:
+            self.show_scene(self.current_scene)
 
     # ======== UI-controlled methods ========
     def start_app(self):
@@ -283,16 +298,18 @@ class UserInterface:
             def on_help_submit():
                 if self.active_help_request is None:
                     # Send new help request
+                    print("SENDING NEW HELP REQUEST")
                     comment = self.app.getTextArea("LAB_COMMENT")
                     is_online = self.app.getCheckBox("Online")
                     zoom_url = self.app.getEntry("TXT_ZOOM")
                     # TODO: validation (e.g. must have zoom link if is_online, must have comment)
                     self.active_help_request = HelpRequest(self.logged_in_group_number, self.selected_module, self.selected_task, is_online,
                                                            zoom_url, comment)
+                    self.active_help_request.queue_pos = self.mqtt_client.queue_pos
                     self.stm_help_request.send("click")
-                    self.active_help_request.queue_pos = 69  # TODO: find queue position
                 else:
                     # Cancel help request
+                    print("CANCELING HELP REQUEST")
                     self.stm_help_request.send("click")
                 self.show_scene(Scene.HELP_REQUEST)
 

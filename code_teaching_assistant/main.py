@@ -107,10 +107,6 @@ class UserInterface:
     def stm_log(self, text: str):
         print(text)
 
-    def stm_task_claimed(self):
-        #TODO: mqtt stuff
-        pass
-
     def stm_request_resolved(self):
         if self.mqtt_client.resolve_request(self.active_help_request.id):
             previous_claimed_request = self.active_help_request
