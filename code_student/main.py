@@ -54,7 +54,6 @@ class MQTTClient:
         if request_type == TYPE_ADD_HELP_REQUEST:
             # Add HelpRequest
             request: HelpRequest = parse_help_request(payload)
-            print(request.id)
             # TODO: adjust queue
         elif request_type == TYPE_CANCEL_HELP_REQUEST:
             # Cancel HelpRequest, TODO: adjust queue
