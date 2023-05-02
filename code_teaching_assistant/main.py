@@ -1,5 +1,3 @@
-import random
-import json
 from typing import Optional
 from threading import Thread
 
@@ -14,11 +12,10 @@ from common.feedback import Feedback
 from common.group import Group
 from common.io_utils import import_modules, import_groups
 from common.help_request import HelpRequest, RequestStatus
-from common.mqtt_utils import parse_help_request, get_request_type, parse_cancel_request
+from common.mqtt_utils import parse_help_request, get_request_type, parse_cancel_request, parse_feedback, TOPIC_TASK, \
+    BROKER, PORT, TOPIC_QUEUE
 import paho.mqtt.client as mqtt
 
-from common.mqtt_utils import BROKER, PORT, TOPIC_QUEUE, TOPIC_TA, RequestWrapper, TYPE_ADD_HELP_REQUEST, \
-    TYPE_CANCEL_HELP_REQUEST
 
 class MQTTClient:
     def __init__(self, stm_teaching_assistant, help_requests:list):
@@ -29,10 +26,12 @@ class MQTTClient:
         self.help_requests = help_requests
         self.help_request_to_add = None
         self.help_request_to_remove = None
+        self.incoming_feedback = []
        
         print(f"Trying to connect to {BROKER}")
         self.client.connect(BROKER, PORT)
         self.client.subscribe(TOPIC_QUEUE)
+        self.client.subscribe(TOPIC_TASK)
         try:
             thread = Thread(target=self.client.loop_forever)
             thread.start()
@@ -52,9 +51,9 @@ class MQTTClient:
         elif req_type == 1:
             self.help_request_to_remove = parse_cancel_request(payload)
             self.stm_teaching_assistant.send("sig_rem_help_req")
-        
-
-    
+        elif req_type == 2:
+            self.incoming_feedback.append(parse_feedback(payload))
+            self.stm_teaching_assistant.send("sig_feedback")
 
 
 class Scene(Enum):
@@ -89,10 +88,8 @@ class UserInterface:
         self.start_app()
 
     # =========== STM-controlled methods =========== ""
-
     def stm_log(self, text: str):
         print(text)
-
 
     def stm_task_claimed(self):
         #TODO: mqtt stuff
@@ -105,12 +102,21 @@ class UserInterface:
     def timer_expired(self):
         self.active_help_request.claimed_by = None
         self.active_help_request = None
-        
         self.show_scene(self.current_scene)
 
     def stm_receive_feedback(self):
-        #TODO: Fix this
-        pass
+        if len(self.mqtt_client.incoming_feedback) > 0:
+            feedback = self.mqtt_client.incoming_feedback.pop()
+            idx = self.get_feedback_idx_for_this_group_module_task(feedback.group_number, feedback.module_number,
+                                                                   feedback.task_number)
+            if idx == -1:
+                self.feedback_responses.append(feedback)  # add
+            else:
+                self.feedback_responses[idx] = feedback  # update
+            if self.current_scene == Scene.TASK_MENU and self.selected_module == feedback.module_number and \
+                    self.selected_task == feedback.task_number:
+                # refresh page if currently in task menu for the right module / task
+                self.show_scene(self.current_scene)
 
     def stm_rec_help_req(self):
         self.help_requests.append(self.mqtt_client.help_request_to_add)
@@ -139,6 +145,13 @@ class UserInterface:
         for i in range(len(self.feedback_responses)):
             fr: Feedback = self.feedback_responses[i]
             if fr.module_number == module_number and fr.task_number == task_number:
+                return i
+        return -1
+
+    def get_feedback_idx_for_this_group_module_task(self, group_number: int, module: int, task: int):
+        for i in range(len(self.feedback_responses)):
+            fr: Feedback = self.feedback_responses[i]
+            if fr.module_number == module and fr.task_number == task and fr.group_number == group_number:
                 return i
         return -1
 
@@ -257,6 +270,8 @@ class UserInterface:
             for request in self.help_requests:
                 if request.status != RequestStatus.COMPLETED:
                     add_help_request_frame(request)
+            if len(self.help_requests) == 0:  # To remove warning
+                self.app.addLabel(str(uuid1()), "")
             self.app.stopScrollPane()
             self.app.stopLabelFrame()
 
@@ -351,6 +366,8 @@ class UserInterface:
             self.app.startScrollPane("PANE_FEEDBACK")
             for feedback in feedback_for_this_task:
                 self.app.addLabel(str(uuid1()), f""" "{feedback.comment}"\n-Group {feedback.group_number} """)
+            if len(feedback_for_this_task) == 0:  # To remove warning
+                self.app.addLabel(str(uuid1()), "")
             self.app.stopScrollPane()
             self.app.stopLabelFrame()
         else:
@@ -361,3 +378,4 @@ if __name__ == "__main__":
     ui = UserInterface(modules=sorted(import_modules(), key=lambda m: m.number),
                        groups=sorted(import_groups(), key=lambda g: g.number))
     ui.driver.stop()
+    ui.mqtt_client.client.disconnect()

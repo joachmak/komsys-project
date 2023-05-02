@@ -1,5 +1,6 @@
 import json
 
+from common.feedback import Feedback
 from common.help_request import HelpRequest
 
 BROKER = "mqtt20.iik.ntnu.no"  # https://github.com/mqtt/mqtt.org/wiki/public_brokers
@@ -31,6 +32,11 @@ def parse_help_request(message: str) -> HelpRequest:
 def parse_cancel_request(message: str) -> str:
     """ Returns id of request to cancel """
     return json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))["id"]
+
+
+def parse_feedback(message: str) -> Feedback:
+    data = json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))
+    return Feedback(data["group_number"], data["module_number"], data["task_number"], data["comment"], data["difficulty"])
 
 
 def get_request_type(message: str) -> int:
