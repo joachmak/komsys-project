@@ -16,7 +16,7 @@ from common.help_request import HelpRequest
 import paho.mqtt.client as mqtt
 
 from common.mqtt_utils import BROKER, PORT, TOPIC_QUEUE, TOPIC_TA, RequestWrapper, TYPE_ADD_HELP_REQUEST, \
-    TYPE_CANCEL_HELP_REQUEST, parse_help_request, TYPE_SEND_FEEDBACK, TOPIC_TASK, TYPE_CLAIM_REQUEST, \
+    TYPE_CANCEL_HELP_REQUEST, TYPE_SEND_FEEDBACK, TOPIC_TASK, TYPE_CLAIM_REQUEST, \
     parse_claim_request, TYPE_CONFIRM_CLAIM, TYPE_RESOLVE_REQUEST, parse_body_field, TYPE_CANCEL_CLAIM
 
 

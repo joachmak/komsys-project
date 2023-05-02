@@ -162,12 +162,16 @@ class UserInterface:
     
     def stm_rem_help_req(self):
         print(self.help_requests)
+        cancelled_request_id = ""
         for i in range (len(self.help_requests)):
             if self.help_requests[i].id == self.mqtt_client.help_request_to_remove:
+                cancelled_request_id = self.help_requests[i].id
                 del self.help_requests[i]
                 break
         if self.current_scene == Scene.MAIN_PAGE:
             self.show_scene(self.current_scene)
+        if self.current_scene == Scene.HELP_REQUEST and self.selected_help_request == cancelled_request_id:
+            self.show_scene(Scene.MAIN_PAGE)
 
     def stm_cancel_claim(self):
         if self.active_help_request is None:
