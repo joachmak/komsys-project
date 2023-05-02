@@ -22,7 +22,7 @@ import paho.mqtt.client as mqtt
 
 
 class MQTTClient:
-    def __init__(self, stm_teaching_assistant, help_requests:list):
+    def __init__(self, stm_teaching_assistant, help_requests: list):
         self.client = mqtt.Client()
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
@@ -68,6 +68,14 @@ class MQTTClient:
             if ta == self.logged_in_ta:
                 print("ta name matches")
                 self.stm_teaching_assistant.send("sig_acc_claim")
+            else:
+                req_id = parse_body_field(payload, "id")
+                for request in self.help_requests:
+                    if request.id == req_id:
+                        request.claimed_by = ta
+                        self.stm_teaching_assistant.send("sig_update_feedback")
+                        break
+
 
     def claim_request(self, request: HelpRequest, ta_name: str) -> bool:
         print(f"going to claim request {request.id}")
@@ -105,7 +113,6 @@ class UserInterface:
         self.current_scene = -1
         self.modules = modules
         self.groups = groups
-        self.help_requests = []
         self.feedback_responses = []
         self.logged_in_user = ""
         self.selected_module = 1
@@ -128,6 +135,11 @@ class UserInterface:
                     self.help_requests.pop(i)
                     break
             self.show_scene(Scene.MAIN_PAGE)
+
+    def stm_update_feedback(self):
+        if self.current_scene == Scene.HELP_REQUEST or self.current_scene == Scene.MAIN_PAGE:
+            self.show_scene(Scene.MAIN_PAGE)
+
 
     def stm_timer_expired(self):
         self.active_help_request.claimed_by = None

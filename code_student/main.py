@@ -106,7 +106,7 @@ class MQTTClient:
 
     def confirm_claim(self, ta: str) -> bool:
         print("Confirming claim")
-        req_body = RequestWrapper(TYPE_CONFIRM_CLAIM, str({'ta': ta}))
+        req_body = RequestWrapper(TYPE_CONFIRM_CLAIM, str({'ta': ta, 'id': self.request_claimed}))
         return self.client.publish(TOPIC_QUEUE, payload=req_body.payload()).is_published()
 
 

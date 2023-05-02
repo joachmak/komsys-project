@@ -54,29 +54,23 @@ def get_stm_states():
         "sig_feedback": "stm_receive_feedback",
         "sig_rec_help_req": "stm_rec_help_req",
         "sig_rem_help_req": "stm_rem_help_req",
-        "resolve_button": "stm_request_resolved"
+        "resolve_button": "stm_request_resolved",
+        "sig_update_feedback": "stm_update_feedback"
     }
     waiting = {
         "name": "waiting",
         "entry": "stm_log('waiting'); start_timer('t', 500)",
         "sig_feedback": "stm_receive_feedback",
         "sig_rec_help_req": "stm_rec_help_req",
-        "sig_rem_help_req": "stm_rem_help_req"
+        "sig_rem_help_req": "stm_rem_help_req",
+        "sig_update_feedback": "stm_update_feedback"
     }
     claimed = {
         "name": "claimed",
         "entry": "stm_log('claimed')",
         "sig_feedback": "stm_receive_feedback",
         "sig_rec_help_req": "stm_rec_help_req",
-        "sig_rem_help_req": "stm_rem_help_req"
+        "sig_rem_help_req": "stm_rem_help_req",
+        "sig_update_feedback": "stm_update_feedback"
     }
     return [unclaimed, waiting, claimed]
-
-
-"""
-TODO: Fix funksjonene:
-- task_claimed
-- request_resolved
-- claim_button
-- resolve_button
-"""
