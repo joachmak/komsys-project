@@ -86,9 +86,18 @@ class MQTTClient:
                 self.help_requests.remove(rec_to_del)
             except ValueError:
                 pass
-            if rec_to_del is not None and self.logged_in_ta != rec_to_del.claimed_by:
+            if rec_to_del is not None:
                 self.stm_teaching_assistant.send("sig_update_feedback")
-
+        elif req_type == TYPE_CANCEL_CLAIM:
+            print("Claim was cancelled")
+            ta = parse_body_field(payload, "ta")
+            if ta != self.logged_in_ta:
+                req_id = parse_body_field(payload, "id")
+                for request in self.help_requests:
+                    if request.id == req_id:
+                        request.claimed_by = None
+                        self.stm_teaching_assistant.send("sig_update_feedback")
+                        break
 
     def claim_request(self, request: HelpRequest, ta_name: str) -> bool:
         print(f"going to claim request {request.id}")
@@ -100,7 +109,7 @@ class MQTTClient:
         return self.client.publish(TOPIC_QUEUE, payload=req_body).is_published()
 
     def cancel_claim(self, req_id: str):
-        req_body = RequestWrapper(TYPE_CANCEL_CLAIM, str({'id': req_id})).payload()
+        req_body = RequestWrapper(TYPE_CANCEL_CLAIM, str({'id': req_id, 'ta': self.logged_in_ta})).payload()
         return self.client.publish(TOPIC_QUEUE, payload=req_body).is_published()
 
 
@@ -407,6 +416,7 @@ class UserInterface:
                 self.app.setButton("BTN_CLAIM", "Cancel claim")
             else:
                 self.app.setButton("BTN_CLAIM", "Claim")
+                self.app.disableButton("BTN_RESOLVE")
                 self.app.disableButton("BTN_CLAIM")
                 self.app.addLabel("LAB_WHY_DISABLED", text="Request is already claimed").config(fg="red")
             self.app.stopLabelFrame()
