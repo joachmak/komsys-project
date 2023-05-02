@@ -55,7 +55,7 @@ def get_stm_states():
         "sig_rec_help_req": "stm_rec_help_req",
         "sig_rem_help_req": "stm_rem_help_req",
         "resolve_button": "stm_request_resolved",
-        "sig_update_feedback": "stm_update_feedback"
+        "sig_update_request": "stm_update_request"
     }
     waiting = {
         "name": "waiting",
@@ -63,7 +63,7 @@ def get_stm_states():
         "sig_feedback": "stm_receive_feedback",
         "sig_rec_help_req": "stm_rec_help_req",
         "sig_rem_help_req": "stm_rem_help_req",
-        "sig_update_feedback": "stm_update_feedback"
+        "sig_update_request": "stm_update_request"
     }
     claimed = {
         "name": "claimed",
@@ -71,6 +71,6 @@ def get_stm_states():
         "sig_feedback": "stm_receive_feedback",
         "sig_rec_help_req": "stm_rec_help_req",
         "sig_rem_help_req": "stm_rem_help_req",
-        "sig_update_feedback": "stm_update_feedback"
+        "sig_update_request": "stm_update_request"
     }
     return [unclaimed, waiting, claimed]

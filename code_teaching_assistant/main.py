@@ -73,7 +73,7 @@ class MQTTClient:
                 for request in self.help_requests:
                     if request.id == req_id:
                         request.claimed_by = ta
-                        self.stm_teaching_assistant.send("sig_update_feedback")
+                        self.stm_teaching_assistant.send("sig_update_request")
                         break
         elif req_type == TYPE_RESOLVE_REQUEST:
             print("Received request resolution message")
@@ -87,7 +87,7 @@ class MQTTClient:
             except ValueError:
                 pass
             if rec_to_del is not None:
-                self.stm_teaching_assistant.send("sig_update_feedback")
+                self.stm_teaching_assistant.send("sig_update_request")
         elif req_type == TYPE_CANCEL_CLAIM:
             print("Claim was cancelled")
             ta = parse_body_field(payload, "ta")
@@ -96,7 +96,7 @@ class MQTTClient:
                 for request in self.help_requests:
                     if request.id == req_id:
                         request.claimed_by = None
-                        self.stm_teaching_assistant.send("sig_update_feedback")
+                        self.stm_teaching_assistant.send("sig_update_request")
                         break
 
     def claim_request(self, request: HelpRequest, ta_name: str) -> bool:
@@ -158,7 +158,7 @@ class UserInterface:
                     break
             self.show_scene(Scene.MAIN_PAGE)
 
-    def stm_update_feedback(self):
+    def stm_update_request(self):
         if self.current_scene == Scene.HELP_REQUEST or self.current_scene == Scene.MAIN_PAGE:
             self.show_scene(Scene.MAIN_PAGE)
 
