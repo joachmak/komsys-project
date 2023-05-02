@@ -62,6 +62,7 @@ def get_stm_states():
         "name": "confirmed",
         "entry": "stm_log('confirmed')",
         "sig_receive_request_claim": "stm_receive_request_claim",
-        "sig_receive_request_resolution": "stm_receive_request_resolution"
+        "sig_receive_request_resolution": "stm_receive_request_resolution",
+        "sig_cancel_claim": "stm_cancel_claim"
     }
     return [unsent, sent, confirmed]

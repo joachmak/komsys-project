@@ -22,6 +22,7 @@ TYPE_CONFIRM_CLAIM = 4
 # From TA
 TYPE_CLAIM_REQUEST = 3
 TYPE_RESOLVE_REQUEST = 5
+TYPE_CANCEL_CLAIM = 6
 
 
 def parse_help_request(message: str) -> HelpRequest:
@@ -44,21 +45,15 @@ def parse_feedback(message: str) -> Feedback:
     return Feedback(data["group_number"], data["module_number"], data["task_number"], data["comment"], data["difficulty"])
 
 
+def parse_body_field(message: str, field: str) -> str:
+    data = json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))
+    return data[field]
+
+
 def parse_claim_request(message: str) -> (str, str):
     """ Return (request_id, ta_name) """
     data = json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))
     return data["id"], data["ta"]
-
-
-def parse_resolve_request(message: str) -> str:
-    """ Returns id of request to resolve. """
-    return json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))["id"]
-
-
-def parse_confirm_claim(message: str) -> str:
-    """ Return ta_name """
-    data = json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))
-    return data["ta"]
 
 
 def get_request_type(message: str) -> int:

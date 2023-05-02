@@ -15,7 +15,7 @@ import paho.mqtt.client as mqtt
 
 from common.mqtt_utils import BROKER, PORT, TOPIC_QUEUE, TOPIC_TA, RequestWrapper, TYPE_ADD_HELP_REQUEST, \
     TYPE_CANCEL_HELP_REQUEST, parse_help_request, TYPE_SEND_FEEDBACK, TOPIC_TASK, TYPE_CLAIM_REQUEST, \
-    parse_claim_request, TYPE_CONFIRM_CLAIM, TYPE_RESOLVE_REQUEST, parse_resolve_request
+    parse_claim_request, TYPE_CONFIRM_CLAIM, TYPE_RESOLVE_REQUEST, parse_body_field, TYPE_CANCEL_CLAIM
 
 
 def clear_retained_messages(client: mqtt.Client):
@@ -37,6 +37,7 @@ class MQTTClient:
         self.ta_claiming_request = None
         self.request_claimed = None
         self.request_to_resolve = None
+        self.request_to_cancel = None
         try:
             thread = Thread(target=self.client.loop_forever)
             thread.start()
@@ -67,9 +68,11 @@ class MQTTClient:
             self.request_claimed = request_id
             self.stm.send("sig_receive_request_claim")
         elif request_type == TYPE_RESOLVE_REQUEST:
-            self.request_to_resolve = parse_resolve_request(payload)
+            self.request_to_resolve = parse_body_field(payload, "id")
             self.stm.send("sig_receive_request_resolution")
-
+        elif request_type == TYPE_CANCEL_CLAIM:
+            self.request_to_cancel = parse_body_field(payload, "id")
+            self.stm.send("sig_cancel_claim")
 
     def request_help(self, request: HelpRequest) -> bool:
         """ Send help request """
@@ -177,6 +180,19 @@ class UserInterface:
         self.active_help_request = None
         if self.current_scene == Scene.HELP_REQUEST and self.selected_module == old_hr.module_number \
                 and self.selected_task == old_hr.task_idx:
+            self.show_scene(self.current_scene)
+
+    def stm_cancel_claim(self):
+        if self.active_help_request is None or self.active_help_request.id != self.mqtt_client.request_to_cancel:
+            self.mqtt_client.request_to_cancel = None
+            return
+        print("stm_cancel_claim this request is for me")
+        self.stm_help_request.send("sig_unclaim")
+        self.mqtt_client.request_to_cancel = None
+        self.mqtt_client.ta_claiming_request = None
+        self.active_help_request.claimed_by = ""
+        if self.current_scene == Scene.HELP_REQUEST and self.selected_module == self.active_help_request.module_number \
+                and self.selected_task == self.active_help_request.task_idx:
             self.show_scene(self.current_scene)
 
     # ======== UI-controlled methods ========

@@ -14,7 +14,8 @@ from common.io_utils import import_modules, import_groups
 from common.help_request import HelpRequest, RequestStatus
 from common.mqtt_utils import parse_help_request, get_request_type, parse_cancel_request, parse_feedback, TOPIC_TASK, \
     BROKER, PORT, TOPIC_QUEUE, RequestWrapper, TYPE_CLAIM_REQUEST, TYPE_ADD_HELP_REQUEST, TYPE_CANCEL_HELP_REQUEST, \
-    TYPE_SEND_FEEDBACK, TYPE_CONFIRM_CLAIM, parse_confirm_claim, TYPE_RESOLVE_REQUEST
+    TYPE_SEND_FEEDBACK, TYPE_CONFIRM_CLAIM, TYPE_RESOLVE_REQUEST, TYPE_CANCEL_CLAIM, \
+    parse_body_field
 import paho.mqtt.client as mqtt
 
 
@@ -58,8 +59,9 @@ class MQTTClient:
             self.stm_teaching_assistant.send("sig_feedback")
         elif req_type == TYPE_CONFIRM_CLAIM:
             print("Received claim confirmation")
-            ta = parse_confirm_claim(payload)
+            ta = parse_body_field(payload, "ta")
             if ta == self.logged_in_ta:
+                print("ta name matches")
                 self.stm_teaching_assistant.send("sig_acc_claim")
 
     def claim_request(self, request: HelpRequest, ta_name: str) -> bool:
@@ -69,6 +71,10 @@ class MQTTClient:
 
     def resolve_request(self, req_id: str):
         req_body = RequestWrapper(TYPE_RESOLVE_REQUEST, str({'id': req_id})).payload()
+        return self.client.publish(TOPIC_QUEUE, payload=req_body).is_published()
+
+    def cancel_claim(self, req_id: str):
+        req_body = RequestWrapper(TYPE_CANCEL_CLAIM, str({'id': req_id})).payload()
         return self.client.publish(TOPIC_QUEUE, payload=req_body).is_published()
 
 
@@ -157,9 +163,17 @@ class UserInterface:
                 break
         if self.current_scene == Scene.MAIN_PAGE:
             self.show_scene(self.current_scene)
-    
-    # =========== UI-controlled methods =========== ""    
 
+    def stm_cancel_claim(self):
+        if self.active_help_request is None:
+            return
+        if self.mqtt_client.cancel_claim(self.active_help_request.id):
+            self.active_help_request.claimed_by = None
+            self.active_help_request = None
+            if self.current_scene == Scene.HELP_REQUEST:
+                self.show_scene(self.current_scene)
+
+    # =========== UI-controlled methods =========== ""
     def start_app(self):
         """ Set up initial scene """
         self.app.setGuiPadding(5, 5)
@@ -228,15 +242,12 @@ class UserInterface:
         self.current_scene = scene
         if scene == Scene.LOGIN:
             def on_login_click():
-
-                """ Try logging in """
                 name = self.app.getEntry("TXT_NAME")
                 if name == "":
                     self.app.setLabel("LAB_ERROR", "Name cannot be empty")
                     return
                 self.logged_in_user = name
                 self.mqtt_client.logged_in_ta = name
-                # TODO: do some MQTT stuff ?
                 self.show_scene(Scene.MAIN_PAGE)
 
             self.set_window_size_and_center(500, 110)
@@ -325,17 +336,17 @@ class UserInterface:
                     if self.mqtt_client.claim_request(current_request, self.logged_in_user):
                         self.active_help_request = current_request
                         self.stm_teaching_assistant.send("claim_button")
+                        self.show_scene(self.current_scene)
                     else:
                         print("Failed to send mqtt claim request")
                 else:
-                    current_request.claimed_by = None  # cancel claim
-                    current_request.status = RequestStatus.SENT
-                    self.active_help_request = None
+                    # cancel claim
+                    print("cancelling claim")
                     self.stm_teaching_assistant.send("cancel_claim")
-                self.show_scene(self.current_scene)
 
             def on_resolve_claim():
                 current_request.status = RequestStatus.COMPLETED
+                self.active_help_request = current_request
                 self.stm_teaching_assistant.send("resolve_button")
 
             self.set_window_size_and_center(500, 250)
