@@ -21,6 +21,7 @@ TYPE_CONFIRM_CLAIM = 4
 
 # From TA
 TYPE_CLAIM_REQUEST = 3
+TYPE_RESOLVE_REQUEST = 5
 
 
 def parse_help_request(message: str) -> HelpRequest:

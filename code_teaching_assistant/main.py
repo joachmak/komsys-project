@@ -14,7 +14,7 @@ from common.io_utils import import_modules, import_groups
 from common.help_request import HelpRequest, RequestStatus
 from common.mqtt_utils import parse_help_request, get_request_type, parse_cancel_request, parse_feedback, TOPIC_TASK, \
     BROKER, PORT, TOPIC_QUEUE, RequestWrapper, TYPE_CLAIM_REQUEST, TYPE_ADD_HELP_REQUEST, TYPE_CANCEL_HELP_REQUEST, \
-    TYPE_SEND_FEEDBACK, TYPE_CONFIRM_CLAIM, parse_confirm_claim
+    TYPE_SEND_FEEDBACK, TYPE_CONFIRM_CLAIM, parse_confirm_claim, TYPE_RESOLVE_REQUEST
 import paho.mqtt.client as mqtt
 
 
@@ -67,6 +67,10 @@ class MQTTClient:
         req_body = RequestWrapper(TYPE_CLAIM_REQUEST, str({'id': request.id, 'ta': ta_name})).payload()
         return self.client.publish(TOPIC_QUEUE, payload=req_body).is_published()
 
+    def resolve_request(self, req_id: str):
+        req_body = RequestWrapper(TYPE_RESOLVE_REQUEST, str({'id': req_id})).payload()
+        return self.client.publish(TOPIC_QUEUE, payload=req_body).is_published()
+
 
 class Scene(Enum):
     LOGIN: int = 0
@@ -108,8 +112,15 @@ class UserInterface:
         pass
 
     def stm_request_resolved(self):
-        #TODO: mqtt stuff
-        pass
+        if self.mqtt_client.resolve_request(self.active_help_request.id):
+            previous_claimed_request = self.active_help_request
+            self.active_help_request = None
+            for i in range(len(self.help_requests)):
+                req: HelpRequest = self.help_requests[i]
+                if req.id == previous_claimed_request.id:
+                    self.help_requests.pop(i)
+                    break
+            self.show_scene(Scene.MAIN_PAGE)
 
     def stm_timer_expired(self):
         self.active_help_request.claimed_by = None
@@ -327,14 +338,9 @@ class UserInterface:
                     self.stm_teaching_assistant.send("cancel_claim")
                 self.show_scene(self.current_scene)
 
-
             def on_resolve_claim():
                 current_request.status = RequestStatus.COMPLETED
                 self.stm_teaching_assistant.send("resolve_button")
-            
-                self.active_help_request = None
-        
-                self.show_scene(self.current_scene)
 
             self.set_window_size_and_center(500, 250)
             add_side_menu(lambda x: self.show_scene(Scene.MAIN_PAGE))
