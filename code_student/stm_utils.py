@@ -52,14 +52,17 @@ def get_stm_transitions():
 def get_stm_states():
     unsent = {
         "name": "unsent",
-        "entry": "stm_log('unsent');"
+        "entry": "stm_log('unsent');",
+        "sig_receive_request_claim": "stm_receive_request_claim"
     }
     sent = {
         "name": "sent",
-        "entry": "stm_log('sent')"
+        "entry": "stm_log('sent')",
+        "sig_receive_request_claim": "stm_receive_request_claim"
     }
     confirmed = {
         "name": "confirmed",
-        "entry": "stm_log('confirmed')"
+        "entry": "stm_log('confirmed')",
+        "sig_receive_request_claim": "stm_receive_request_claim"
     }
     return [unsent, sent, confirmed]

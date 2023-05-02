@@ -17,6 +17,7 @@ TOPIC_SERVER = TOPIC_BASE + "server"
 TYPE_ADD_HELP_REQUEST = 0
 TYPE_CANCEL_HELP_REQUEST = 1
 TYPE_SEND_FEEDBACK = 2
+TYPE_CONFIRM_CLAIM = 4
 
 # From TA
 TYPE_CLAIM_REQUEST = 3
@@ -41,6 +42,18 @@ def parse_cancel_request(message: str) -> str:
 def parse_feedback(message: str) -> Feedback:
     data = json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))
     return Feedback(data["group_number"], data["module_number"], data["task_number"], data["comment"], data["difficulty"])
+
+
+def parse_claim_request(message: str) -> (str, str):
+    """ Return (request_id, ta_name) """
+    data = json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))
+    return data["id"], data["ta"]
+
+
+def parse_confirm_claim(message: str) -> str:
+    """ Return ta_name """
+    data = json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))
+    return data["ta"]
 
 
 def get_request_type(message: str) -> int:

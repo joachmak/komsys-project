@@ -13,7 +13,8 @@ from common.group import Group
 from common.io_utils import import_modules, import_groups
 from common.help_request import HelpRequest, RequestStatus
 from common.mqtt_utils import parse_help_request, get_request_type, parse_cancel_request, parse_feedback, TOPIC_TASK, \
-    BROKER, PORT, TOPIC_QUEUE, RequestWrapper, TYPE_CLAIM_REQUEST
+    BROKER, PORT, TOPIC_QUEUE, RequestWrapper, TYPE_CLAIM_REQUEST, TYPE_ADD_HELP_REQUEST, TYPE_CANCEL_HELP_REQUEST, \
+    TYPE_SEND_FEEDBACK, TYPE_CONFIRM_CLAIM, parse_confirm_claim
 import paho.mqtt.client as mqtt
 
 
@@ -27,6 +28,7 @@ class MQTTClient:
         self.help_request_to_add = None
         self.help_request_to_remove = None
         self.incoming_feedback = []
+        self.logged_in_ta = None
        
         print(f"Trying to connect to {BROKER}")
         self.client.connect(BROKER, PORT)
@@ -45,19 +47,24 @@ class MQTTClient:
         print("on_message(): topic: {}, data: {}".format(msg.topic, msg.payload))
         payload = str(msg.payload).replace("\\", "")
         req_type = get_request_type(str(msg.payload).replace("\\", ""))
-        if req_type == 0:
+        if req_type == TYPE_ADD_HELP_REQUEST:
             self.help_request_to_add = parse_help_request(payload)
             self.stm_teaching_assistant.send("sig_rec_help_req")
-        elif req_type == 1:
+        elif req_type == TYPE_CANCEL_HELP_REQUEST:
             self.help_request_to_remove = parse_cancel_request(payload)
             self.stm_teaching_assistant.send("sig_rem_help_req")
-        elif req_type == 2:
+        elif req_type == TYPE_SEND_FEEDBACK:
             self.incoming_feedback.append(parse_feedback(payload))
             self.stm_teaching_assistant.send("sig_feedback")
+        elif req_type == TYPE_CONFIRM_CLAIM:
+            print("Received claim confirmation")
+            ta = parse_confirm_claim(payload)
+            if ta == self.logged_in_ta:
+                self.stm_teaching_assistant.send("sig_acc_claim")
 
-    def claim_request(self, request: HelpRequest) -> bool:
+    def claim_request(self, request: HelpRequest, ta_name: str) -> bool:
         print(f"going to claim request {request.id}")
-        req_body = RequestWrapper(TYPE_CLAIM_REQUEST, str({'id': request.id})).payload()
+        req_body = RequestWrapper(TYPE_CLAIM_REQUEST, str({'id': request.id, 'ta': ta_name})).payload()
         return self.client.publish(TOPIC_QUEUE, payload=req_body).is_published()
 
 
@@ -219,6 +226,7 @@ class UserInterface:
                     self.app.setLabel("LAB_ERROR", "Name cannot be empty")
                     return
                 self.logged_in_user = name
+                self.mqtt_client.logged_in_ta = name
                 # TODO: do some MQTT stuff ?
                 self.show_scene(Scene.MAIN_PAGE)
 
@@ -305,7 +313,7 @@ class UserInterface:
                 if current_request.claimed_by is None:
                     current_request.claimed_by = self.logged_in_user  # claim
                     current_request.status = RequestStatus.CONFIRMED
-                    if self.mqtt_client.claim_request(current_request):
+                    if self.mqtt_client.claim_request(current_request, self.logged_in_user):
                         self.active_help_request = current_request
                         self.stm_teaching_assistant.send("claim_button")
                     else:

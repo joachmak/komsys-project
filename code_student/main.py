@@ -15,7 +15,8 @@ from common.help_request import HelpRequest
 import paho.mqtt.client as mqtt
 
 from common.mqtt_utils import BROKER, PORT, TOPIC_QUEUE, TOPIC_TA, RequestWrapper, TYPE_ADD_HELP_REQUEST, \
-    TYPE_CANCEL_HELP_REQUEST, TOPIC_BASE, parse_help_request, TYPE_SEND_FEEDBACK, TOPIC_TASK
+    TYPE_CANCEL_HELP_REQUEST, TOPIC_BASE, parse_help_request, TYPE_SEND_FEEDBACK, TOPIC_TASK, TYPE_CLAIM_REQUEST, \
+    parse_claim_request, TYPE_CONFIRM_CLAIM
 
 
 def clear_retained_messages(client: mqtt.Client):
@@ -24,15 +25,18 @@ def clear_retained_messages(client: mqtt.Client):
 
 
 class MQTTClient:
-    def __init__(self):
+    def __init__(self, stm: Machine):
         self.client = mqtt.Client()
         self.queue_pos = 1
+        self.stm = stm
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
         print(f"Trying to connect to {BROKER}")
-        self.client.connect(BROKER, PORT)  # Remove in prod
-        #clear_retained_messages(self.client)
+        self.client.connect(BROKER, PORT)
+        clear_retained_messages(self.client)  # Remove in prod
         self.client.subscribe(TOPIC_QUEUE)
+        self.ta_claiming_request = None
+        self.request_claimed = None
         try:
             thread = Thread(target=self.client.loop_forever)
             thread.start()
@@ -45,10 +49,24 @@ class MQTTClient:
     def on_message(self, client, userdata, msg: mqtt.MQTTMessage):
         print("on_message(): topic: {}, data: {}".format(msg.topic, msg.payload))
         request_type = int(str(msg.payload).split(": ")[1][0])
-        if request_type == 0:
+        payload = str(msg.payload).replace("\\", "")
+        if request_type == TYPE_ADD_HELP_REQUEST:
             # Add HelpRequest
-            request: HelpRequest = parse_help_request(str(msg.payload).replace("\\", ""))
+            request: HelpRequest = parse_help_request(payload)
             print(request.id)
+            # TODO: adjust queue
+        elif request_type == TYPE_CANCEL_HELP_REQUEST:
+            # Cancel HelpRequest, TODO: adjust queue
+            print("Cancelling request")
+        elif request_type == TYPE_CLAIM_REQUEST:
+            print("Received claim request from ta")
+            if self.ta_claiming_request is not None:
+                return
+            request_id, ta_name = parse_claim_request(payload)
+            self.ta_claiming_request = ta_name
+            self.request_claimed = request_id
+            self.stm.send("sig_receive_request_claim")
+
 
     def request_help(self, request: HelpRequest) -> bool:
         """ Send help request """
@@ -66,6 +84,11 @@ class MQTTClient:
         req_body = RequestWrapper(TYPE_SEND_FEEDBACK, feedback.payload())
         return self.client.publish(TOPIC_TASK, payload=req_body.payload()).is_published()
 
+    def confirm_claim(self, ta: str) -> bool:
+        print("Confirming claim")
+        req_body = RequestWrapper(TYPE_CONFIRM_CLAIM, str({'ta': ta}))
+        return self.client.publish(TOPIC_QUEUE, payload=req_body.payload()).is_published()
+
 
 class Scene(Enum):
     LOGIN: int = 0
@@ -78,11 +101,12 @@ class Scene(Enum):
 class UserInterface:
     def __init__(self, modules: list, groups: list):
         self.app = gui("Student Client", "1x1")  # size is set in show_scene() method
-        self.mqtt_client = MQTTClient()
 
         self.stm_help_request = Machine(name="stm_student_help_request", transitions=get_stm_transitions(), obj=self, states=get_stm_states())
         self.driver = Driver()
         self.driver.add_machine(self.stm_help_request)
+
+        self.mqtt_client = MQTTClient(self.stm_help_request)
 
         self.current_scene = -1
         self.modules = modules
@@ -119,6 +143,27 @@ class UserInterface:
         if success:
             self.active_help_request = None
             self.show_scene(self.current_scene)
+
+    def stm_receive_request_claim(self):
+        print("stm received request claim")
+        if self.active_help_request is None or self.active_help_request.id != self.mqtt_client.request_claimed:
+            # the request claim was not meant for this student. If it was, TA will time out anyway
+            print("the request claim was not for this student")
+            self.mqtt_client.ta_claiming_request = None
+            self.mqtt_client.request_claimed = None
+            return
+        if self.active_help_request.claimed_by == "":
+            ta = self.mqtt_client.ta_claiming_request
+            print(f"Ta {ta} wants to claim current help request, and we're gonna let him")
+            if self.mqtt_client.confirm_claim(ta):
+                self.active_help_request.claimed_by = ta
+                if self.current_scene == Scene.HELP_REQUEST:
+                    # if user is watching the help request page, refresh the scene
+                    self.show_scene(self.current_scene)
+        print("Hmm, none of the ifs were triggered...")
+        print(f"Active help request is claimed by: {self.active_help_request.claimed_by}")
+
+
 
     # ======== UI-controlled methods ========
     def start_app(self):

@@ -18,7 +18,8 @@ def get_stm_transitions():
     t3 = {
         "source": "waiting",
         "target": "claimed",
-        "trigger": "sig_acc_claim"
+        "trigger": "sig_acc_claim",
+        "effect": "stop_timer('t')"
     }
     t4 = {
         "source": "claimed",
