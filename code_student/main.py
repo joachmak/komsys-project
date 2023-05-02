@@ -1,3 +1,4 @@
+import datetime
 from threading import Thread
 from typing import Optional
 
@@ -7,6 +8,7 @@ from uuid import uuid1
 
 from stmpy import Machine, Driver
 
+from code_student.queue_manager import QueueManager
 from code_student.stm_utils import get_stm_transitions, get_stm_states
 from common.feedback import Feedback
 from common.io_utils import import_modules, import_groups
@@ -26,18 +28,25 @@ def clear_retained_messages(client: mqtt.Client):
 class MQTTClient:
     def __init__(self, stm: Machine):
         self.client = mqtt.Client()
-        self.queue_pos = 1
-        self.stm = stm
+
+        # mqtt setup
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
         print(f"Trying to connect to {BROKER}")
+        # clear_retained_messages(self.client)
         self.client.connect(BROKER, PORT)
-        clear_retained_messages(self.client)  # Remove in prod
         self.client.subscribe(TOPIC_QUEUE)
+
+        # misc
+        self.stm = stm
         self.ta_claiming_request = None
         self.request_claimed = None
         self.request_to_resolve = None
         self.request_to_cancel = None
+
+        # queue sys
+        self.queue_manager = QueueManager()
+        self.recently_added_req_id = None
         try:
             thread = Thread(target=self.client.loop_forever)
             thread.start()
@@ -52,12 +61,14 @@ class MQTTClient:
         request_type = int(str(msg.payload).split(": ")[1][0])
         payload = str(msg.payload).replace("\\", "")
         if request_type == TYPE_ADD_HELP_REQUEST:
-            # Add HelpRequest
-            request: HelpRequest = parse_help_request(payload)
-            # TODO: adjust queue
+            req_id = parse_body_field(payload, "id")
+            is_mine = self.recently_added_req_id == req_id
+            self.queue_manager.on_add(req_id, datetime.datetime.now(), is_mine)
+            self.stm.send("sig_update_queue_pos")
         elif request_type == TYPE_CANCEL_HELP_REQUEST:
-            # Cancel HelpRequest, TODO: adjust queue
-            print("Cancelling request")
+            req_id = parse_body_field(payload, "id")
+            self.queue_manager.on_cancel(req_id)
+            self.stm.send("sig_update_queue_pos")
         elif request_type == TYPE_CLAIM_REQUEST:
             print("Received claim request from ta")
             if self.ta_claiming_request is not None:
@@ -67,7 +78,10 @@ class MQTTClient:
             self.request_claimed = request_id
             self.stm.send("sig_receive_request_claim")
         elif request_type == TYPE_RESOLVE_REQUEST:
-            self.request_to_resolve = parse_body_field(payload, "id")
+            req_id = parse_body_field(payload, "id")
+            self.request_to_resolve = req_id
+            self.queue_manager.on_resolve(req_id)
+            self.stm.send("sig_update_queue_pos")
             self.stm.send("sig_receive_request_resolution")
         elif request_type == TYPE_CANCEL_CLAIM:
             self.request_to_cancel = parse_body_field(payload, "id")
@@ -77,7 +91,8 @@ class MQTTClient:
         """ Send help request """
         print(f"Sending help request")
         req_body = RequestWrapper(TYPE_ADD_HELP_REQUEST, request.payload()).payload()
-        return self.client.publish(TOPIC_QUEUE, payload=req_body, retain=True).is_published()
+        self.recently_added_req_id = request.id
+        return self.client.publish(TOPIC_QUEUE, payload=req_body).is_published()
 
     def cancel_request(self, request_id: str) -> bool:
         """ Cancel help request by id """
@@ -107,7 +122,8 @@ class UserInterface:
     def __init__(self, modules: list, groups: list):
         self.app = gui("Student Client", "1x1")  # size is set in show_scene() method
 
-        self.stm_help_request = Machine(name="stm_student_help_request", transitions=get_stm_transitions(), obj=self, states=get_stm_states())
+        self.stm_help_request = Machine(name="stm_student_help_request", transitions=get_stm_transitions(), obj=self,
+                                        states=get_stm_states())
         self.driver = Driver()
         self.driver.add_machine(self.stm_help_request)
 
@@ -192,6 +208,13 @@ class UserInterface:
         self.active_help_request.claimed_by = ""
         if self.current_scene == Scene.HELP_REQUEST and self.selected_module == self.active_help_request.module_number \
                 and self.selected_task == self.active_help_request.task_idx:
+            self.show_scene(self.current_scene)
+
+    def stm_update_queue_pos(self):
+        if self.current_scene == Scene.HELP_REQUEST and self.active_help_request is not None and \
+                self.selected_task == self.active_help_request.task_idx and \
+                self.selected_module == self.active_help_request.module_number:
+            # refresh page
             self.show_scene(self.current_scene)
 
     # ======== UI-controlled methods ========
@@ -318,9 +341,10 @@ class UserInterface:
                     is_online = self.app.getCheckBox("Online")
                     zoom_url = self.app.getEntry("TXT_ZOOM")
                     # TODO: validation (e.g. must have zoom link if is_online, must have comment)
-                    self.active_help_request = HelpRequest(self.logged_in_group_number, self.selected_module, self.selected_task, is_online,
+                    self.active_help_request = HelpRequest(self.logged_in_group_number, self.selected_module,
+                                                           self.selected_task, is_online,
                                                            zoom_url, comment)
-                    self.active_help_request.queue_pos = self.mqtt_client.queue_pos
+                    self.active_help_request.queue_pos = self.mqtt_client.queue_manager.global_q_pos + 1
                     self.stm_help_request.send("click")
                 else:
                     # Cancel help request
@@ -350,7 +374,8 @@ class UserInterface:
                 self.app.setLabel("LAB_SENT_STATUS", text="Request status: SENT")
                 self.app.setButton("BTN_SUBMIT", "Cancel help request")
                 self.app.setLabelFg("LAB_SENT_STATUS", "orange")
-                self.app.addLabel("LAB_QUEUE_POS", text=f"Position in queue: {self.active_help_request.queue_pos}")
+                self.app.addLabel("LAB_QUEUE_POS",
+                                  text=f"Position in queue: {self.mqtt_client.queue_manager.local_q_pos}")
             else:
                 self.app.setTextArea("LAB_COMMENT", text=self.active_help_request.comment)
                 self.app.setCheckBox("Online", ticked=self.active_help_request.is_online)
@@ -358,7 +383,8 @@ class UserInterface:
                 self.app.disableTextArea("LAB_COMMENT")
                 self.app.disableCheckBox("Online")
                 self.app.disableEntry("TXT_ZOOM")
-                self.app.setLabel("LAB_SENT_STATUS", text=f"Request status: CONFIRMED by {self.active_help_request.claimed_by}")
+                self.app.setLabel("LAB_SENT_STATUS",
+                                  text=f"Request status: CONFIRMED by {self.active_help_request.claimed_by}")
                 self.app.setLabelFg("LAB_SENT_STATUS", "green")
                 self.app.setButton("BTN_SUBMIT", "Cancel help request")
                 self.app.disableButton("BTN_SUBMIT")
@@ -417,12 +443,14 @@ class UserInterface:
             feedback_idx = self.get_feedback_idx_for_this_module_task(self.selected_module, self.selected_task)
             if feedback_idx != -1:
                 feedback = self.feedback_responses[feedback_idx]
-                self.app.addLabel("LAB_FEEDBACK_STATUS", text=f"Status: DONE, difficulty: {feedback.difficulty}").config(fg="green")
+                self.app.addLabel("LAB_FEEDBACK_STATUS",
+                                  text=f"Status: DONE, difficulty: {feedback.difficulty}").config(fg="green")
             else:
                 self.app.addLabel("LAB_FEEDBACK_STATUS", text=f"Status: UNFINISHED").config(fg="red")
             self.app.addButton("BTN_MARK_AS_DONE", lambda x: self.show_scene(Scene.MARK_TASK_AS_DONE))
             self.app.addButton("BTN_REQUEST_HELP", lambda x: self.show_scene(Scene.HELP_REQUEST))
-            self.app.setButton("BTN_MARK_AS_DONE", "Mark task as done" if feedback_idx == -1 else "Update task feedback")
+            self.app.setButton("BTN_MARK_AS_DONE",
+                               "Mark task as done" if feedback_idx == -1 else "Update task feedback")
             self.app.setButton("BTN_REQUEST_HELP", "Send help request")
             if self.active_help_request is not None and not has_selected_task_an_active_request():
                 self.app.disableButton("BTN_REQUEST_HELP")
