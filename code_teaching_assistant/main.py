@@ -1,5 +1,6 @@
 from typing import Optional
 from threading import Thread
+import subprocess
 
 from appJar import gui
 from enum import Enum
@@ -51,6 +52,8 @@ class MQTTClient:
         if req_type == TYPE_ADD_HELP_REQUEST:
             self.help_request_to_add = parse_help_request(payload)
             self.stm_teaching_assistant.send("sig_rec_help_req")
+            audio_file = "data/notification_sound.mp3"
+            subprocess.call(["afplay", audio_file]) # Make sound to notify the TA's
         elif req_type == TYPE_CANCEL_HELP_REQUEST:
             self.help_request_to_remove = parse_cancel_request(payload)
             self.stm_teaching_assistant.send("sig_rem_help_req")
