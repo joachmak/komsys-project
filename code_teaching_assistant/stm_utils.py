@@ -48,7 +48,7 @@ def get_stm_states():
     }
     waiting = {
         "name": "waiting",
-        "entry": "stm_log('waiting'); start_timer('t', 5000); stm_task_claimed",
+        "entry": "stm_log('waiting'); start_timer('t', 500); stm_task_claimed",
         "sig_feedback": "stm_receive_feedback",
         "sig_rec_help_req": "stm_rec_help_req",
         "sig_rem_help_req": "stm_rem_help_req"

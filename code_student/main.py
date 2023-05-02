@@ -54,7 +54,7 @@ class MQTTClient:
         """ Send help request """
         print(f"Sending help request")
         req_body = RequestWrapper(TYPE_ADD_HELP_REQUEST, request.payload()).payload()
-        return self.client.publish(TOPIC_QUEUE, payload=req_body).is_published()
+        return self.client.publish(TOPIC_QUEUE, payload=req_body, retain=True).is_published()
 
     def cancel_request(self, request_id: str) -> bool:
         """ Cancel help request by id """

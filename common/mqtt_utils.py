@@ -13,9 +13,13 @@ TOPIC_TASK = TOPIC_BASE + "task"
 TOPIC_QUEUE = TOPIC_BASE + "queue"
 TOPIC_SERVER = TOPIC_BASE + "server"
 
+# From student
 TYPE_ADD_HELP_REQUEST = 0
 TYPE_CANCEL_HELP_REQUEST = 1
 TYPE_SEND_FEEDBACK = 2
+
+# From TA
+TYPE_CLAIM_REQUEST = 3
 
 
 def parse_help_request(message: str) -> HelpRequest:

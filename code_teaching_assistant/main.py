@@ -13,7 +13,7 @@ from common.group import Group
 from common.io_utils import import_modules, import_groups
 from common.help_request import HelpRequest, RequestStatus
 from common.mqtt_utils import parse_help_request, get_request_type, parse_cancel_request, parse_feedback, TOPIC_TASK, \
-    BROKER, PORT, TOPIC_QUEUE
+    BROKER, PORT, TOPIC_QUEUE, RequestWrapper, TYPE_CLAIM_REQUEST
 import paho.mqtt.client as mqtt
 
 
@@ -54,6 +54,11 @@ class MQTTClient:
         elif req_type == 2:
             self.incoming_feedback.append(parse_feedback(payload))
             self.stm_teaching_assistant.send("sig_feedback")
+
+    def claim_request(self, request: HelpRequest) -> bool:
+        print(f"going to claim request {request.id}")
+        req_body = RequestWrapper(TYPE_CLAIM_REQUEST, str({'id': request.id})).payload()
+        return self.client.publish(TOPIC_QUEUE, payload=req_body).is_published()
 
 
 class Scene(Enum):
@@ -98,6 +103,12 @@ class UserInterface:
     def stm_request_resolved(self):
         #TODO: mqtt stuff
         pass
+
+    def stm_timer_expired(self):
+        self.active_help_request.claimed_by = None
+        self.active_help_request = None
+        if self.current_scene == Scene.HELP_REQUEST:
+            self.show_scene(self.current_scene)
 
     def timer_expired(self):
         self.active_help_request.claimed_by = None
@@ -267,7 +278,7 @@ class UserInterface:
 
             self.app.startLabelFrame("Unresolved help requests", sticky="news", row=5, rowspan=5, column=1, colspan=3)
             self.app.startScrollPane("PANE_HELP_REQUESTS")
-            for request in self.help_requests:
+            for request in sorted(self.help_requests, key=lambda x: x.time, reverse=True):
                 if request.status != RequestStatus.COMPLETED:
                     add_help_request_frame(request)
             if len(self.help_requests) == 0:  # To remove warning
@@ -294,9 +305,11 @@ class UserInterface:
                 if current_request.claimed_by is None:
                     current_request.claimed_by = self.logged_in_user  # claim
                     current_request.status = RequestStatus.CONFIRMED
-                    self.active_help_request = current_request
-                    self.stm_teaching_assistant.send("claim_button")
-
+                    if self.mqtt_client.claim_request(current_request):
+                        self.active_help_request = current_request
+                        self.stm_teaching_assistant.send("claim_button")
+                    else:
+                        print("Failed to send mqtt claim request")
                 else:
                     current_request.claimed_by = None  # cancel claim
                     current_request.status = RequestStatus.SENT
