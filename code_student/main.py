@@ -15,7 +15,7 @@ from common.help_request import HelpRequest
 import paho.mqtt.client as mqtt
 
 from common.mqtt_utils import BROKER, PORT, TOPIC_QUEUE, TOPIC_TA, RequestWrapper, TYPE_ADD_HELP_REQUEST, \
-    TYPE_CANCEL_HELP_REQUEST, TOPIC_BASE, parse_help_request
+    TYPE_CANCEL_HELP_REQUEST, TOPIC_BASE, parse_help_request, TYPE_SEND_FEEDBACK, TOPIC_TASK
 
 
 def clear_retained_messages(client: mqtt.Client):
@@ -62,6 +62,10 @@ class MQTTClient:
         req_body = RequestWrapper(TYPE_CANCEL_HELP_REQUEST, str({"id": request_id})).payload()
         return self.client.publish(TOPIC_QUEUE, payload=req_body).is_published()
 
+    def send_feedback(self, feedback: Feedback) -> bool:
+        req_body = RequestWrapper(TYPE_SEND_FEEDBACK, feedback.payload())
+        return self.client.publish(TOPIC_TASK, payload=req_body.payload()).is_published()
+
 
 class Scene(Enum):
     LOGIN: int = 0
@@ -73,7 +77,7 @@ class Scene(Enum):
 
 class UserInterface:
     def __init__(self, modules: list, groups: list):
-        self.app = gui("Teacher Assistant Client", "1x1")  # size is set in show_scene() method
+        self.app = gui("Student Client", "1x1")  # size is set in show_scene() method
         self.mqtt_client = MQTTClient()
 
         self.stm_help_request = Machine(name="stm_student_help_request", transitions=get_stm_transitions(), obj=self, states=get_stm_states())
@@ -131,9 +135,13 @@ class UserInterface:
         return -1
 
     def add_or_update_feedback_response(self, feedback: Feedback):
+        if not self.mqtt_client.send_feedback(feedback):
+            print("failed to send feedback via mqtt")
+            return
         feedback_idx = self.get_feedback_idx_for_this_module_task(feedback.module_number, feedback.task_number)
-        if  feedback_idx == -1:  # doesn't exist, add new
+        if feedback_idx == -1:  # doesn't exist, add new
             self.feedback_responses.append(feedback)
+            # TODO: reflect in UI that feedback wasn't sent
             return
         self.feedback_responses[feedback_idx] = feedback  # exists, replace
 
@@ -182,11 +190,9 @@ class UserInterface:
         self.current_scene = scene
         if scene == Scene.LOGIN:
             def on_login_click():
-                """ Try logging in """
                 group_name = self.app.getOptionBox("Group")
                 self.logged_in_user = group_name
                 self.logged_in_group_number = int(group_name.split(" ")[1][:-1])
-                # TODO: do some MQTT stuff ?
                 self.show_scene(Scene.MAIN_PAGE)
 
             self.set_window_size_and_center(500, 100)
@@ -238,11 +244,10 @@ class UserInterface:
                     self.active_help_request = HelpRequest(self.logged_in_group_number, self.selected_module, self.selected_task, is_online,
                                                            zoom_url, comment)
                     self.stm_help_request.send("click")
-                    # TODO: mqtt stuff
                     self.active_help_request.queue_pos = 69  # TODO: find queue position
                 else:
+                    # Cancel help request
                     self.stm_help_request.send("click")
-                    # TODO: mqtt stuff
                 self.show_scene(Scene.HELP_REQUEST)
 
             self.set_window_size_and_center(500, 300)
@@ -277,8 +282,6 @@ class UserInterface:
                 feedback_response = Feedback(self.logged_in_group_number, self.selected_module, self.selected_task,
                                              feedback, difficulty)
                 self.add_or_update_feedback_response(feedback_response)
-                # TODO: mqtt stuff
-                print("sending mqtt request")
                 self.show_scene(self.current_scene)
 
             self.set_window_size_and_center(500, 300)

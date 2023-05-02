@@ -14,7 +14,7 @@ from common.feedback import Feedback
 from common.group import Group
 from common.io_utils import import_modules, import_groups
 from common.help_request import HelpRequest, RequestStatus
-from common.mqtt_utils import parse_help_request, check_req_type, parse_cancel_request
+from common.mqtt_utils import parse_help_request, get_request_type, parse_cancel_request
 import paho.mqtt.client as mqtt
 
 from common.mqtt_utils import BROKER, PORT, TOPIC_QUEUE, TOPIC_TA, RequestWrapper, TYPE_ADD_HELP_REQUEST, \
@@ -44,13 +44,13 @@ class MQTTClient:
 
     def on_message(self, client, userdata, msg: mqtt.MQTTMessage):
         print("on_message(): topic: {}, data: {}".format(msg.topic, msg.payload))
-
-        req_type = check_req_type(str(msg.payload).replace("\\", ""))
+        payload = str(msg.payload).replace("\\", "")
+        req_type = get_request_type(str(msg.payload).replace("\\", ""))
         if req_type == 0:
-            self.help_request_to_add = parse_help_request(str(msg.payload).replace("\\", ""))
+            self.help_request_to_add = parse_help_request(payload)
             self.stm_teaching_assistant.send("sig_rec_help_req")
         elif req_type == 1:
-            self.help_request_to_remove = parse_cancel_request(str(msg.payload).replace("\\", ""))
+            self.help_request_to_remove = parse_cancel_request(payload)
             self.stm_teaching_assistant.send("sig_rem_help_req")
         
 
@@ -69,8 +69,6 @@ class UserInterface:
     def __init__(self, modules: list, groups: list):
         self.app = gui("Teacher Assistant Client", "1x1")  # size is set in show_scene() method
         self.help_requests = []
-        
-
         self.stm_teaching_assistant = Machine(name="stm_teaching_assistant", transitions=get_stm_transitions(), obj=self, states=get_stm_states())
         self.driver = Driver()
         self.driver.add_machine(self.stm_teaching_assistant)
@@ -83,20 +81,6 @@ class UserInterface:
         self.groups = groups
         self.help_requests = []
         self.feedback_responses = []
-        # generate fake feedback responses
-        for i in range(10):
-            comments = ["5/7 great task", "not so happy about this one", "hmm, could be easier", "damn, this was difficult"]
-            difficulty = ["Easy", "Medium", "Hard"]
-            self.feedback_responses.append(Feedback(random.randint(1, 9), random.randint(1, 9), 0,
-                                                    comments[random.randint(0, 3)], difficulty[random.randint(0, 2)]))
-        # generate fake help requests
-        for i in range(3):
-            comments = ["Help pls", "What even is this ???", "Do we fail if we don't deliver anything?",
-                        "How far away are the stars? O:"]
-            self.help_requests.append(HelpRequest(random.randint(1, 9), random.randint(1, 9), 1, random.randint(0,1) == 1, "", comments[random.randint(0, 3)]))
-            self.help_requests = sorted(self.help_requests, key=lambda x: x.time, reverse=True)
-            for j in range(len(self.help_requests)):
-                self.help_requests[j].queue_pos = j+1
         self.logged_in_user = ""
         self.selected_module = 1
         self.selected_task = 1

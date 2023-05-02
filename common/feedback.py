@@ -8,3 +8,6 @@ class Feedback:
         self.task_number = task_number
         self.comment = comment
         self.difficulty = difficulty
+
+    def payload(self):
+        return str(vars(self))

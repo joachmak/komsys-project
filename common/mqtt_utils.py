@@ -14,9 +14,14 @@ TOPIC_SERVER = TOPIC_BASE + "server"
 
 TYPE_ADD_HELP_REQUEST = 0
 TYPE_CANCEL_HELP_REQUEST = 1
+TYPE_SEND_FEEDBACK = 2
 
 
 def parse_help_request(message: str) -> HelpRequest:
+    """
+    :param message: message to parse
+    :return: help request object with data contained in message
+    """
     data = json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))
     data["is_online"] = bool(data["is_online"])
     return HelpRequest(data["group_number"], data["module_number"], data["task_idx"], data["is_online"],
@@ -25,15 +30,11 @@ def parse_help_request(message: str) -> HelpRequest:
 
 def parse_cancel_request(message: str) -> str:
     """ Returns id of request to cancel """
-    data = json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))
-    print(data['id'])
-    return data["id"]
+    return json.loads(str(message.split("\"")[1].replace("'", "\"").strip()))["id"]
 
 
-def check_req_type(message: str) -> HelpRequest:
-    data = json.loads(str(message.split("\"")[0].replace("'", "\"").strip().split(",")[0])[2:] + "}")
-    request_type = int(data['request_type'])
-    return request_type
+def get_request_type(message: str) -> int:
+    return int(json.loads(str(message.split("\"")[0].replace("'", "\"").strip().split(",")[0])[2:] + "}")['request_type'])
 
 
 class RequestWrapper:
