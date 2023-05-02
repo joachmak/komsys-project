@@ -275,10 +275,10 @@ class UserInterface:
                 self.selected_help_request = request_id
                 self.show_scene(Scene.HELP_REQUEST)
 
-            def add_help_request_frame(_request: HelpRequest):
+            def add_help_request_frame(_request: HelpRequest, num: int):
                 self.app.addLabel(
                     f"LAB_GROUP_{_request.id}",
-                    f"{_request.queue_pos}: Group {_request.group_number}, module {_request.module_number}, task {_request.task_idx + 1}, time "
+                    f"{num}: Group {_request.group_number}, module {_request.module_number}, task {_request.task_idx + 1}, time "
                     f"{str(_request.time).split('.')[0]}",
                     column=0, row=self.app.getRow())
                 self.app.addButton(f"{_request.id}", see_request, column=1, row=self.app.getRow()-1)
@@ -311,9 +311,11 @@ class UserInterface:
 
             self.app.startLabelFrame("Unresolved help requests", sticky="news", row=5, rowspan=5, column=1, colspan=3)
             self.app.startScrollPane("PANE_HELP_REQUESTS")
-            for request in sorted(self.help_requests, key=lambda x: x.time, reverse=True):
+            i = 1
+            for request in sorted(self.help_requests, key=lambda x: x.time):
                 if request.status != RequestStatus.COMPLETED:
-                    add_help_request_frame(request)
+                    add_help_request_frame(request, i)
+                    i += 1
             if len(self.help_requests) == 0:  # To remove warning
                 self.app.addLabel(str(uuid1()), "")
             self.app.stopScrollPane()
