@@ -16,12 +16,6 @@ def get_stm_transitions():
         "trigger": "click",
         "effect": "stm_cancel_help_request"
     }
-    t3 = {
-        "source": "sent",
-        "target": "sent",
-        "trigger": "sig_queue",
-        "effect": "update_queue_position"
-    }
     t4 = {
         "source": "sent",
         "target": "confirmed",
@@ -42,14 +36,13 @@ def get_stm_transitions():
         "target": "unsent",
         "trigger": "sig_resolve"
     }
-    return [t0, t1, t2, t3, t4, t5, t6, t7]
+    return [t0, t1, t2, t4, t5, t6, t7]
 
 
 def get_stm_states():
     unsent = {
         "name": "unsent",
         "entry": "stm_log('unsent');",
-        "sig_receive_request_claim": "stm_receive_request_claim",
         "sig_receive_request_resolution": "stm_receive_request_resolution"
     }
     sent = {
